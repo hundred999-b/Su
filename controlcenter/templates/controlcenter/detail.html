@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+{% load controlcenter_tags %}
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>{{ config.title }} #{{ object.pk }} — ShopU</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+    margin:0;
+    background:#f1f5f9;
+    color:#17202a;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+header{
+    background:#111827;
+    color:white;
+    padding:18px;
+}
+
+header h1{
+    max-width:1100px;
+    margin:auto;
+    font-size:22px;
+}
+
+main{
+    max-width:1100px;
+    margin:auto;
+    padding:22px 15px 50px;
+}
+
+.top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    margin-bottom:18px;
+}
+
+a,button{
+    border:0;
+    border-radius:9px;
+    padding:10px 13px;
+    text-decoration:none;
+    font-weight:700;
+    background:white;
+    color:#17202a;
+    cursor:pointer;
+    font:inherit;
+}
+
+.primary{
+    background:#111827;
+    color:white;
+}
+
+.danger{
+    background:#fee2e2;
+    color:#991b1b;
+}
+
+.actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+}
+
+.actions form{
+    margin:0;
+}
+
+.card{
+    background:white;
+    border-radius:15px;
+    padding:20px;
+    margin-bottom:18px;
+    box-shadow:0 2px 10px #0000000b;
+    overflow:hidden;
+}
+
+.card h2{
+    margin-top:0;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th,td{
+    padding:12px;
+    text-align:left;
+    vertical-align:top;
+    border-bottom:1px solid #eef2f7;
+    font-size:13px;
+}
+
+tr:last-child th,
+tr:last-child td{
+    border-bottom:0;
+}
+
+th{
+    width:230px;
+    color:#64748b;
+    font-weight:700;
+}
+
+pre{
+    white-space:pre-wrap;
+    word-break:break-word;
+    margin:0;
+    background:#f8fafc;
+    padding:12px;
+    border-radius:8px;
+    overflow:auto;
+}
+
+.badge{
+    display:inline-block;
+    padding:5px 9px;
+    border-radius:999px;
+    background:#e2e8f0;
+    font-size:12px;
+    font-weight:700;
+}
+
+@media(max-width:600px){
+    .top{
+        flex-direction:column;
+        align-items:flex-start;
+    }
+
+    .actions{
+        width:100%;
+    }
+
+    .actions a,
+    .actions button{
+        flex:1;
+        text-align:center;
+    }
+
+    th{
+        width:40%;
+    }
+
+    th,td{
+        padding:9px 6px;
+        font-size:12px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>{{ config.icon }} {{ config.title }} #{{ object.pk }}</h1>
+</header>
+
+<main>
+
+<div class="top">
+
+<a href="{% url 'controlcenter:section_list' section %}">
+ Back
+</a>
+
+<div class="actions">
+
+{% if can_edit %}
+<a class="primary"
+   href="{% url 'controlcenter:section_edit' section object.pk %}">
+Edit
+</a>
+{% endif %}
+
+{% for action in actions %}
+
+<form method="post"
+      action="{% url 'controlcenter:section_action' section object.pk action.key %}">
+{% csrf_token %}
+
+<button type="submit"
+        {% if action.danger %}class="danger"{% endif %}
+>
+{{ action.label }}
+</button>
+
+</form>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+<div class="card">
+
+<table>
+<tbody>
+
+{% for field in fields %}
+
+<tr>
+
+<th>{{ field.verbose_name|title }}</th>
+
+<td>
+
+{% if field.name == "metadata" or field.name == "provider_metadata" or field.name == "specifications" or field.name == "specifications_snapshot" or field.name == "listing_policy_content" or field.name == "policy_content_snapshot" %}
+
+<pre>{{ object|field_value:field.name }}</pre>
+
+{% else %}
+
+{{ object|field_value:field.name }}
+
+{% endif %}
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+</table>
+
+</div>
+
+{% if related %}
+
+<div class="card">
+
+<h2>Related Objects</h2>
+
+<table>
+
+<tbody>
+
+{% for item in related %}
+
+<tr>
+<th>{{ item.name|title }}</th>
+<td>{{ item.value }}</td>
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+{% endif %}
+
+</main>
+
+</body>
+</html>

@@ -375,3 +375,7 @@ NOWPAYMENTS_PAYOUT_ENABLED = os.environ.get(
     "NOWPAYMENTS_PAYOUT_ENABLED", "0"
 ) == "1"
 
+
+
+# Use Django Admin authentication for the ShopU Control Center.
+LOGIN_URL = "/admin/login/"

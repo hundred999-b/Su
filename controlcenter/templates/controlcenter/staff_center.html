@@ -1,113 +1,154 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShopU Staff Center</title>
-    <style>
-        *{box-sizing:border-box}
-        body{
-            margin:0;
-            font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-            background:#f4f6f8;
-            color:#17202a;
-        }
-        header{
-            background:#111827;
-            color:white;
-            padding:22px 18px;
-        }
-        .head{
-            max-width:1000px;
-            margin:auto;
-        }
-        h1{margin:0;font-size:23px}
-        .sub{opacity:.7;font-size:13px;margin-top:5px}
-        main{
-            max-width:1000px;
-            margin:25px auto;
-            padding:0 16px;
-        }
-        .roles{
-            display:flex;
-            flex-wrap:wrap;
-            gap:8px;
-            margin:12px 0 25px;
-        }
-        .role{
-            background:white;
-            border-radius:20px;
-            padding:8px 13px;
-            font-size:13px;
-            box-shadow:0 2px 8px rgba(0,0,0,.05);
-        }
-        .grid{
-            display:grid;
-            grid-template-columns:repeat(3,1fr);
-            gap:14px;
-        }
-        .card{
-            background:white;
-            border-radius:14px;
-            padding:18px;
-            text-decoration:none;
-            color:#17202a;
-            box-shadow:0 2px 10px rgba(0,0,0,.05);
-        }
-        .card strong{display:block;margin-top:8px}
-        .card span{font-size:12px;color:#64748b}
-        .icon{font-size:25px}
-        @media(max-width:700px){
-            .grid{grid-template-columns:repeat(2,1fr)}
-        }
-        @media(max-width:450px){
-            .grid{grid-template-columns:1fr}
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>ShopU Staff Center</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+    margin:0;
+    background:#f1f5f9;
+    color:#17202a;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+header{
+    background:#111827;
+    color:white;
+    padding:20px;
+}
+
+main{
+    max-width:1100px;
+    margin:auto;
+    padding:22px 15px 50px;
+}
+
+.roles{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:15px 0 25px;
+}
+
+.role{
+    background:white;
+    padding:9px 13px;
+    border-radius:999px;
+    box-shadow:0 2px 8px #0000000b;
+    font-size:13px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:13px;
+}
+
+.card{
+    background:white;
+    padding:18px;
+    border-radius:14px;
+    text-decoration:none;
+    color:#17202a;
+    box-shadow:0 2px 10px #0000000b;
+}
+
+.icon{
+    font-size:26px;
+}
+
+.card strong{
+    display:block;
+    margin-top:8px;
+}
+
+.card span{
+    color:#64748b;
+    font-size:12px;
+}
+
+@media(max-width:700px){
+    .grid{
+        grid-template-columns:repeat(2,1fr);
+    }
+}
+
+@media(max-width:450px){
+    .grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
 </head>
 
 <body>
 
 <header>
-    <div class="head">
-        <h1>ShopU Staff Center</h1>
-        <div class="sub">Authorized staff workspace</div>
-    </div>
+<h1>ShopU Staff Center</h1>
+<div>Authorized staff workspace</div>
 </header>
 
 <main>
 
-    <h2>Welcome, {{ request.user.username }}</h2>
+<h2>Welcome, {{ request.user.username }}</h2>
 
-    <p>Your active roles:</p>
+<p>Your active roles:</p>
 
-    <div class="roles">
-        {% for role in roles %}
-            <div class="role">{{ role.name }}</div>
-        {% empty %}
-            <div class="role">No active roles assigned</div>
-        {% endfor %}
-    </div>
+<div class="roles">
 
-    <h3>Available Areas</h3>
+{% for role in roles %}
+<div class="role">
+{{ role.name }}
+</div>
+{% empty %}
+<div class="role">
+No active roles assigned
+</div>
+{% endfor %}
 
-    <div class="grid">
+</div>
 
-        {% for permission in permissions.view %}
-            <a class="card" href="/admin/">
-                <div class="icon">🔐</div>
-                <strong>{{ permission }}</strong>
-                <span>Open authorized area</span>
-            </a>
-        {% empty %}
-            <div class="card">
-                <div class="icon">ℹ️</div>
-                <strong>No areas assigned</strong>
-                <span>Ask an administrator to assign a role.</span>
-            </div>
-        {% endfor %}
+<h3>Authorized Areas</h3>
 
-    </div>
+<div class="grid">
+
+{% for item in sections %}
+
+<a class="card"
+   href="{% url 'controlcenter:section_list' item.key %}">
+
+<div class="icon">
+{{ item.icon }}
+</div>
+
+<strong>
+{{ item.title }}
+</strong>
+
+<span>
+Open authorized area
+</span>
+
+</a>
+
+{% empty %}
+
+<div class="card">
+<div class="icon">ℹ️</div>
+<strong>No areas assigned</strong>
+<span>
+Ask an administrator to assign a role.
+</span>
+</div>
+
+{% endfor %}
+
+</div>
 
 </main>
 

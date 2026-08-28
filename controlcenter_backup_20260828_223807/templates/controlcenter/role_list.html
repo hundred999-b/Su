@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ShopU Roles</title>
+<style>
+body{margin:0;background:#f4f6f8;font-family:system-ui;color:#17202a}
+header{background:#111827;color:white;padding:20px}
+main{max-width:1000px;margin:25px auto;padding:0 15px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+a,.button{background:white;color:#111827;padding:10px 14px;border-radius:9px;text-decoration:none;font-weight:700;border:0}
+.primary{background:#111827;color:white}
+.card{background:white;padding:18px;margin-bottom:12px;border-radius:14px;box-shadow:0 2px 10px #0000000d}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.meta{color:#64748b;font-size:13px;margin-top:5px}
+.badge{font-size:11px;padding:5px 8px;border-radius:10px;background:#dcfce7}
+.off{background:#fee2e2}
+form{display:inline}
+@media(max-width:600px){.row{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>Roles & Permissions</h1>
+</header>
+
+<main>
+
+<div class="actions">
+<a href="/control-center/">← Control Center</a>
+<a class="primary" href="/control-center/manage/roles/create/">+ Create Role</a>
+</div>
+
+{% for role in roles %}
+
+<div class="card">
+
+<div class="row">
+
+<div>
+<h3>{{ role.name }}</h3>
+
+<div class="meta">
+{{ role.description|default:"No description" }}
+</div>
+
+<div class="meta">
+{{ role.users.count }} assigned staff
+</div>
+
+</div>
+
+<div>
+{% if role.active %}
+<span class="badge">ACTIVE</span>
+{% else %}
+<span class="badge off">DISABLED</span>
+{% endif %}
+</div>
+
+</div>
+
+<br>
+
+<a href="/control-center/manage/roles/{{ role.id }}/edit/">Edit</a>
+
+<form method="post" action="/control-center/manage/roles/{{ role.id }}/toggle/">
+{% csrf_token %}
+<button class="button" type="submit">
+{% if role.active %}Disable{% else %}Activate{% endif %}
+</button>
+</form>
+
+</div>
+
+{% empty %}
+
+<div class="card">
+No roles have been created.
+</div>
+
+{% endfor %}
+
+</main>
+</body>
+</html>

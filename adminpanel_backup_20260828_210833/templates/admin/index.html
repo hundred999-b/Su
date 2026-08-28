@@ -1,0 +1,28 @@
+{% extends "admin/base_site.html" %}
+{% load i18n shopu_admin %}
+{% block content %}
+<div class="shopu-dashboard">
+  <h1>ShopU Control Center</h1>
+  <div class="shopu-grid">
+    {% for label,key in dashboard_cards %}
+    <a class="shopu-card" href="{{ shopu_dashboard.urls|get_item:key }}"><strong>{{ shopu_dashboard|get_item:key }}</strong><span>{{ label }}</span></a>
+    {% endfor %}
+  </div>
+  <h2>Quick access</h2>
+  <div class="shopu-links">
+    <a href="{{ shopu_dashboard.urls.payments }}">Payments</a>
+    <a href="{{ shopu_dashboard.urls.withdrawals }}">Withdrawals</a>
+    <a href="{{ shopu_dashboard.urls.disputes }}">Dispute events</a>
+    <a href="{{ shopu_dashboard.urls.verification }}">Vendor verification</a>
+    <a href="{{ shopu_dashboard.urls.referrals }}">Referrals</a>
+    <a href="{{ shopu_dashboard.urls.gift_cards }}">Gift-card top-ups</a>
+    <a href="{{ shopu_dashboard.urls.terms }}">Terms & policies</a>
+    <a href="{{ shopu_dashboard.urls.currencies }}">Currencies</a>
+    <a href="{{ shopu_dashboard.urls.gateways }}">Payment gateways</a>
+    <a href="{{ shopu_dashboard.urls.staff_roles }}">Staff roles</a>
+  </div>
+</div>
+<style>
+.shopu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:20px 0}.shopu-card{display:block;padding:18px;border:1px solid #ddd;border-radius:10px;text-decoration:none;background:#fff}.shopu-card strong{display:block;font-size:28px}.shopu-card span{display:block;margin-top:5px;color:#555}.shopu-links{display:flex;flex-wrap:wrap;gap:10px}.shopu-links a{padding:10px 14px;border:1px solid #ddd;border-radius:8px;text-decoration:none;background:#fff}
+</style>
+{% endblock %}

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>ShopU Control Center</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+    margin:0;
+    background:#f1f5f9;
+    color:#17202a;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+header{
+    background:#111827;
+    color:white;
+    padding:18px;
+}
+
+.head{
+    max-width:1400px;
+    margin:auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:15px;
+}
+
+.logo{
+    font-size:22px;
+    font-weight:900;
+}
+
+.sub{
+    color:#94a3b8;
+    font-size:12px;
+}
+
+nav{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+nav a{
+    color:white;
+    text-decoration:none;
+    padding:9px 12px;
+    border-radius:8px;
+    background:#1f2937;
+    font-size:13px;
+    font-weight:700;
+}
+
+main{
+    max-width:1400px;
+    margin:auto;
+    padding:25px 16px 50px;
+}
+
+.hero{
+    margin-bottom:25px;
+}
+
+.hero h1{
+    margin:0 0 5px;
+    font-size:28px;
+}
+
+.hero p{
+    margin:0;
+    color:#64748b;
+}
+
+.stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:15px;
+    margin-bottom:30px;
+}
+
+.stat{
+    background:white;
+    padding:20px;
+    border-radius:15px;
+    box-shadow:0 2px 10px #0000000b;
+}
+
+.stat-label{
+    color:#64748b;
+    font-size:13px;
+}
+
+.stat-value{
+    font-size:30px;
+    font-weight:900;
+    margin-top:5px;
+}
+
+h2{
+    margin:25px 0 14px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+}
+
+.card{
+    background:white;
+    color:#17202a;
+    text-decoration:none;
+    padding:18px;
+    border-radius:15px;
+    box-shadow:0 2px 10px #0000000b;
+    transition:.15s;
+}
+
+.card:hover{
+    transform:translateY(-2px);
+    box-shadow:0 5px 18px #00000012;
+}
+
+.icon{
+    font-size:27px;
+}
+
+.name{
+    display:block;
+    font-weight:800;
+    margin-top:9px;
+}
+
+.count{
+    display:block;
+    color:#64748b;
+    font-size:12px;
+    margin-top:4px;
+}
+
+@media(max-width:950px){
+    .grid{
+        grid-template-columns:repeat(3,1fr);
+    }
+}
+
+@media(max-width:700px){
+    .head{
+        flex-direction:column;
+        align-items:flex-start;
+    }
+
+    .stats{
+        grid-template-columns:1fr;
+    }
+
+    .grid{
+        grid-template-columns:repeat(2,1fr);
+    }
+}
+
+@media(max-width:450px){
+    .grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<div class="head">
+
+<div>
+<div class="logo">ShopU Control Center</div>
+<div class="sub">
+{% if request.user.is_superuser %}
+Superuser Administration
+{% else %}
+Authorized Staff Workspace
+{% endif %}
+</div>
+</div>
+
+<nav>
+<a href="{% url 'controlcenter:control_center' %}">Dashboard</a>
+
+{% if request.user.is_superuser %}
+<a href="{% url 'controlcenter:staff_list' %}">Staff</a>
+<a href="{% url 'controlcenter:role_list' %}">Roles</a>
+{% endif %}
+
+<a href="/admin/">Django Admin</a>
+</nav>
+
+</div>
+</header>
+
+<main>
+
+<section class="hero">
+<h1>Welcome, {{ request.user.username }}</h1>
+<p>ShopU marketplace operations and administration.</p>
+</section>
+
+<section class="stats">
+
+<div class="stat">
+<div class="stat-label">Total Users</div>
+<div class="stat-value">{{ stats.users }}</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">Active Users</div>
+<div class="stat-value">{{ stats.active_users }}</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">Staff Accounts</div>
+<div class="stat-value">{{ stats.staff }}</div>
+</div>
+
+</section>
+
+<h2>Control Center</h2>
+
+<section class="grid">
+
+{% for item in sections %}
+
+<a class="card"
+   href="{% url 'controlcenter:section_list' item.key %}">
+
+<div class="icon">{{ item.icon }}</div>
+
+<span class="name">{{ item.title }}</span>
+
+<span class="count">
+{{ item.count }} record{{ item.count|pluralize }}
+</span>
+
+</a>
+
+{% endfor %}
+
+</section>
+
+</main>
+
+</body>
+</html>
