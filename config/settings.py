@@ -106,6 +106,7 @@ INSTALLED_APPS = [
     'stage4',
     'referrals',
     'support',
+    'controlcenter',
 ]
 
 MIDDLEWARE = [

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ShopU Staff</title>
+<style>
+body{margin:0;background:#f4f6f8;font-family:system-ui;color:#17202a}
+header{background:#111827;color:white;padding:20px}
+main{max-width:1000px;margin:25px auto;padding:0 15px}
+.actions{margin-bottom:20px}
+a,button{display:inline-block;padding:10px 14px;border-radius:9px;border:0;text-decoration:none;font-weight:700}
+a{background:white;color:#111827}
+button{background:#111827;color:white}
+.card{background:white;padding:18px;margin-bottom:12px;border-radius:14px;box-shadow:0 2px 10px #0001}
+.row{display:flex;justify-content:space-between;gap:15px;align-items:center}
+.meta{font-size:13px;color:#64748b;margin-top:5px}
+.role{display:inline-block;background:#eef2ff;padding:5px 8px;border-radius:12px;font-size:11px;margin:3px}
+.active{color:#15803d;font-weight:700}
+.inactive{color:#b91c1c;font-weight:700}
+@media(max-width:600px){.row{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>Staff Management</h1>
+</header>
+
+<main>
+
+<div class="actions">
+<a href="/control-center/">← Control Center</a><a href="/control-center/manage/staff/create/">+ Add Staff</a>
+</div>
+
+{% for member in staff %}
+
+<div class="card">
+
+<div class="row">
+
+<div>
+
+<h3>{{ member.username }}</h3>
+
+<div class="meta">
+{{ member.email|default:"No email" }}
+</div>
+
+{% if member.is_active %}
+<div class="active">● Active</div>
+{% else %}
+<div class="inactive">● Disabled</div>
+{% endif %}
+
+<div>
+{% for role in member.shopu_staff_roles.all %}
+<span class="role">{{ role.name }}</span>
+{% empty %}
+<span class="meta">No roles assigned</span>
+{% endfor %}
+</div>
+
+</div>
+
+<div>
+
+<a href="/control-center/manage/staff/{{ member.id }}/edit/">Edit</a><form method="post" action="/control-center/manage/staff/{{ member.id }}/toggle/">
+{% csrf_token %}
+<button type="submit">
+{% if member.is_active %}Deactivate{% else %}Activate{% endif %}
+</button>
+</form>
+
+</div>
+
+</div>
+
+</div>
+
+{% empty %}
+
+<div class="card">
+No staff accounts found.
+</div>
+
+{% endfor %}
+
+</main>
+</body>
+</html>

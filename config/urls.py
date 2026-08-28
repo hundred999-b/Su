@@ -24,6 +24,7 @@ from config.maintenance import auto_release
 from config.views import health, home
 
 urlpatterns = [
+    path("control-center/", include("controlcenter.urls")),
     path("", home, name="home"),
     path("health/", health, name="health"),
     path("api/support/", include("support.urls")),
