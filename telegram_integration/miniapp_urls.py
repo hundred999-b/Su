@@ -1,0 +1,8 @@
+from django.urls import path
+from django.shortcuts import render
+from . import miniapp_api
+
+def index(request): return render(request,'miniapp/index.html')
+urlpatterns=[
+ path('',index,name='miniapp'),path('bootstrap/',miniapp_api.bootstrap),path('products/',miniapp_api.products),path('profile/',miniapp_api.profile),path('profile/photo/',miniapp_api.profile_photo),path('listing-policy/',miniapp_api.listing_policy),path('buyer-terms/',miniapp_api.buyer_terms),path('buyer-terms/accept/',miniapp_api.accept_buyer_terms),path('products/create/',miniapp_api.create_product_api),path('products/<int:product_id>/buy/',miniapp_api.buy_product),path('orders/',miniapp_api.orders),path('orders/<int:order_id>/deliver/',miniapp_api.mark_delivered),path('orders/<int:order_id>/confirm/',miniapp_api.confirm_order),path('orders/<int:order_id>/dispute/',miniapp_api.dispute_order),path('vendor/<int:seller_id>/',miniapp_api.vendor_profile),path('vendor/<int:seller_id>/report/',miniapp_api.report_vendor),path('reviews/create/',miniapp_api.create_review_api),path('reviews/<int:review_id>/edit/',miniapp_api.edit_review_api),path('notifications/',miniapp_api.notifications),path('notifications/<int:notification_id>/read/',miniapp_api.mark_notification_read),path('escrow/create/',miniapp_api.create_private_escrow),path('escrow/<str:escrow_id>/',miniapp_api.private_escrow),path('escrow/<str:escrow_id>/join/',miniapp_api.join_private_escrow),path('escrow/<str:escrow_id>/fund/',miniapp_api.fund_private),path('escrow/<str:escrow_id>/deliver/',miniapp_api.mark_private_delivered),path('escrow/<str:escrow_id>/release/',miniapp_api.release_private),
+]

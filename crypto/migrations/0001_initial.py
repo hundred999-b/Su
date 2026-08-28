@@ -1,0 +1,9 @@
+from django.conf import settings
+from django.db import migrations, models
+class Migration(migrations.Migration):
+    initial=True
+    dependencies=[('auth','0012_alter_user_first_name_max_length')]
+    operations=[
+        migrations.CreateModel(name='CryptoDeposit',fields=[('id',models.BigAutoField(auto_created=True,primary_key=True,serialize=False,verbose_name='ID')),('asset',models.CharField(max_length=10)),('network',models.CharField(blank=True,max_length=40)),('amount',models.DecimalField(decimal_places=12,max_digits=24)),('address',models.CharField(max_length=255)),('tx_hash',models.CharField(max_length=255,unique=True)),('confirmations',models.PositiveIntegerField(default=0)),('status',models.CharField(choices=[('pending','Pending'),('confirmed','Confirmed'),('failed','Failed')],default='pending',max_length=20)),('created_at',models.DateTimeField(auto_now_add=True)),('confirmed_at',models.DateTimeField(blank=True,null=True)),('user',models.ForeignKey(on_delete=models.deletion.PROTECT,related_name='crypto_deposits',to=settings.AUTH_USER_MODEL))]),
+        migrations.CreateModel(name='CryptoWithdrawal',fields=[('id',models.BigAutoField(auto_created=True,primary_key=True,serialize=False,verbose_name='ID')),('asset',models.CharField(max_length=10)),('network',models.CharField(blank=True,max_length=40)),('amount',models.DecimalField(decimal_places=12,max_digits=24)),('fee',models.DecimalField(decimal_places=12,default=0,max_digits=24)),('destination_address',models.CharField(max_length=255)),('tx_hash',models.CharField(blank=True,max_length=255)),('status',models.CharField(choices=[('pending','Pending'),('processing','Processing'),('completed','Completed'),('failed','Failed')],default='pending',max_length=20)),('created_at',models.DateTimeField(auto_now_add=True)),('user',models.ForeignKey(on_delete=models.deletion.PROTECT,related_name='crypto_withdrawals',to=settings.AUTH_USER_MODEL))]),
+    ]

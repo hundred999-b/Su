@@ -1,0 +1,2157 @@
+============================================================
+ SHOPU — BACKGROUND WORK IMPLEMENTATION SOURCE REVIEW
+============================================================
+
+===== PAYMENTS =====
+payments/apps.py
+payments/models.py
+payments/migrations/0001_initial.py
+payments/migrations/0002_payment_user.py
+payments/migrations/0003_payment_gateway_fields.py
+payments/migrations/__init__.py
+payments/migrations/0004_multi_currency_precision.py
+payments/admin.py
+payments/services.py
+payments/stripe_service.py
+payments/views.py
+payments/tests.py
+payments/__init__.py
+payments/urls.py
+payments/models.py:7:    PENDING = "pending"
+payments/models.py:10:    REFUNDED = "refunded"
+payments/models.py:12:    STATUS_CHOICES = [
+payments/models.py:13:        (PENDING, "Pending"),
+payments/models.py:16:        (REFUNDED, "Refunded"),
+payments/models.py:37:    status = models.CharField(
+payments/models.py:39:        choices=STATUS_CHOICES,
+payments/models.py:40:        default=PENDING,
+payments/migrations/0001_initial.py:22:                ('status', models.CharField(choices=[('pending', 'Pending'), ('succeeded', 'Succeeded'), ('failed', 'Failed'), ('refunded', 'Refunded')], default='pending', max_length=20)),
+payments/admin.py:11:        "amount", "currency", "status", "created_at",
+payments/admin.py:17:    list_filter = ("provider", "status", "currency")
+payments/services.py:14:PAYSTACK_BASE = "https://api.paystack.co"
+payments/services.py:17:def _paystack_headers():
+payments/services.py:18:    key = getattr(settings, "PAYSTACK_SECRET_KEY", "").strip()
+payments/services.py:20:        raise RuntimeError("PAYSTACK_SECRET_KEY is not configured.")
+payments/services.py:57:            "status": Payment.PENDING,
+payments/services.py:70:def initialize_paystack_payment(*, user, amount, currency=None, email=None, metadata=None):
+payments/services.py:71:    currency = (currency or getattr(settings, "PAYSTACK_CURRENCY", "")).upper()
+payments/services.py:73:        raise ValueError("A currency is required for Paystack funding.")
+payments/services.py:74:    allowed = getattr(settings, "PAYSTACK_ALLOWED_CURRENCIES", [currency])
+payments/services.py:76:        raise ValueError("This currency is not enabled for Paystack funding.")
+payments/services.py:92:        provider="paystack",
+payments/services.py:110:    callback_url = getattr(settings, "PAYSTACK_CALLBACK_URL", "").strip()
+payments/services.py:114:    response = requests.post(
+payments/services.py:115:        f"{PAYSTACK_BASE}/transaction/initialize",
+payments/services.py:116:        headers=_paystack_headers(),
+payments/services.py:120:    response.raise_for_status()
+payments/services.py:122:    if not data.get("status") or not data.get("data"):
+payments/services.py:123:        raise ValueError(data.get("message") or "Paystack initialization failed.")
+payments/services.py:130:        "paystack": {
+payments/services.py:139:def _verify_paystack_reference(reference):
+payments/services.py:140:    response = requests.get(
+payments/services.py:141:        f"{PAYSTACK_BASE}/transaction/verify/{reference}",
+payments/services.py:142:        headers=_paystack_headers(),
+payments/services.py:145:    response.raise_for_status()
+payments/services.py:152:    if payment.status == Payment.SUCCEEDED:
+payments/services.py:154:    if payment.status not in (Payment.PENDING,):
+payments/services.py:155:        raise ValueError("Only pending payments can succeed.")
+payments/services.py:171:    payment.status = Payment.SUCCEEDED
+payments/services.py:172:    payment.save(update_fields=["status"])
+payments/services.py:182:                payment=payment, gift_card_id=gift_card_id, status=GiftCardPurchase.PENDING
+payments/services.py:190:def verify_paystack_payment(reference):
+payments/services.py:192:        provider="paystack",
+payments/services.py:198:    result = _verify_paystack_reference(reference)
+payments/services.py:200:    status = data.get("status")
+payments/services.py:204:        raise ValueError("Paystack amount does not match the ShopU payment.")
+payments/services.py:206:        raise ValueError("Paystack currency does not match the ShopU payment.")
+payments/services.py:208:    if status == "success":
+payments/services.py:210:    elif status in ("failed", "abandoned", "reversed"):
+payments/services.py:211:        payment.status = Payment.FAILED
+payments/services.py:212:        payment.save(update_fields=["status"])
+payments/services.py:216:def verify_paystack_signature(raw_body, signature):
+payments/services.py:217:    secret = getattr(settings, "PAYSTACK_SECRET_KEY", "").strip()
+payments/services.py:238:        if config.provider == "stripe":
+payments/services.py:239:            from .stripe_service import initialize_stripe_payment
+payments/services.py:240:            return initialize_stripe_payment(user=user, amount=amount, currency=currency, email=email, metadata=metadata)
+payments/services.py:241:        if config.provider == "paystack":
+payments/services.py:242:            return initialize_paystack_payment(user=user, amount=amount, currency=currency, email=email, metadata=metadata)
+payments/stripe_service.py:4:import stripe
+payments/stripe_service.py:18:def initialize_stripe_payment(*, user, amount, currency, email=None, metadata=None):
+payments/stripe_service.py:19:    key = getattr(settings, "STRIPE_SECRET_KEY", "").strip()
+payments/stripe_service.py:21:        raise RuntimeError("STRIPE_SECRET_KEY is not configured.")
+payments/stripe_service.py:23:    allowed = getattr(settings, "STRIPE_ALLOWED_CURRENCIES", [])
+payments/stripe_service.py:25:        raise ValueError("This currency is not enabled for Stripe funding.")
+payments/stripe_service.py:32:    success_url = getattr(settings, "STRIPE_SUCCESS_URL", "").strip()
+payments/stripe_service.py:33:    cancel_url = getattr(settings, "STRIPE_CANCEL_URL", "").strip()
+payments/stripe_service.py:35:        raise RuntimeError("STRIPE_SUCCESS_URL and STRIPE_CANCEL_URL are required.")
+payments/stripe_service.py:37:    reference = f"SHOPU-STRIPE-{uuid.uuid4().hex.upper()}"
+payments/stripe_service.py:41:        provider="stripe",
+payments/stripe_service.py:47:    stripe.api_key = key
+payments/stripe_service.py:48:    session = stripe.checkout.Session.create(
+payments/stripe_service.py:66:    payment.metadata = {**payment.metadata, "stripe_session_id": session.id}
+payments/stripe_service.py:72:def handle_stripe_webhook(payload, signature):
+payments/stripe_service.py:73:    secret = getattr(settings, "STRIPE_WEBHOOK_SECRET", "").strip()
+payments/stripe_service.py:75:        raise RuntimeError("STRIPE_WEBHOOK_SECRET is not configured.")
+payments/stripe_service.py:78:        raise ValueError("Stripe signature is required.")
+payments/stripe_service.py:80:    stripe.api_key = getattr(settings, "STRIPE_SECRET_KEY", "").strip()
+payments/stripe_service.py:81:    event = stripe.Webhook.construct_event(payload, signature, secret)
+payments/stripe_service.py:88:    if session.get("payment_status") != "paid":
+payments/stripe_service.py:101:        provider="stripe",
+payments/stripe_service.py:108:    # The Stripe session must identify the exact ShopU payment.
+payments/stripe_service.py:111:        raise ValueError("Stripe ShopU payment mismatch.")
+payments/stripe_service.py:115:        raise ValueError("Stripe reference mismatch.")
+payments/stripe_service.py:118:    # duplicate webhook without touching the wallet again.
+payments/stripe_service.py:119:    if payment.status == Payment.SUCCEEDED:
+payments/stripe_service.py:122:    if payment.status != Payment.PENDING:
+payments/stripe_service.py:123:        raise ValueError("Stripe payment is not pending.")
+payments/stripe_service.py:129:        raise ValueError("Stripe amount mismatch.")
+payments/stripe_service.py:132:        raise ValueError("Stripe currency mismatch.")
+payments/views.py:7:    initialize_paystack_payment,
+payments/views.py:8:    verify_paystack_payment,
+payments/views.py:9:    verify_paystack_signature,
+payments/views.py:21:def initialize_paystack(request):
+payments/views.py:23:        return JsonResponse({"error": "POST required"}, status=405)
+payments/views.py:26:        return JsonResponse({"error": "Telegram authentication required"}, status=401)
+payments/views.py:29:        payment = initialize_paystack_payment(
+payments/views.py:36:        return JsonResponse({"error": str(exc)}, status=400)
+payments/views.py:44:        "status": payment.status,
+payments/views.py:49:def verify_payment(request):
+payments/views.py:51:        return JsonResponse({"error": "POST required"}, status=405)
+payments/views.py:54:        return JsonResponse({"error": "Telegram authentication required"}, status=401)
+payments/views.py:58:        return JsonResponse({"error": "reference is required"}, status=400)
+payments/views.py:62:        provider="paystack", provider_reference=reference, user=user
+payments/views.py:64:        return JsonResponse({"error": "Payment not found"}, status=404)
+payments/views.py:67:        payment, provider_data = verify_paystack_payment(reference)
+payments/views.py:69:        return JsonResponse({"error": str(exc)}, status=400)
+payments/views.py:73:        "status": payment.status,
+payments/views.py:75:        "provider_status": provider_data.get("status"),
+payments/views.py:80:def paystack_webhook(request):
+payments/views.py:82:        return JsonResponse({"error": "POST required"}, status=405)
+payments/views.py:84:    signature = request.headers.get("x-paystack-signature", "")
+payments/views.py:85:    if not verify_paystack_signature(request.body, signature):
+payments/views.py:86:        return JsonResponse({"error": "Invalid signature"}, status=401)
+payments/views.py:91:        return JsonResponse({"error": "Invalid JSON"}, status=400)
+payments/views.py:99:                provider="paystack", provider_reference=reference
+payments/views.py:103:                    verify_paystack_payment(reference)
+payments/views.py:107:                        status=500,
+payments/views.py:112:def initialize_stripe(request):
+payments/views.py:114:        return JsonResponse({"error": "POST required"}, status=405)
+payments/views.py:117:        return JsonResponse({"error": "Telegram authentication required"}, status=401)
+payments/views.py:119:        from .stripe_service import initialize_stripe_payment
+payments/views.py:120:        payment = initialize_stripe_payment(
+payments/views.py:127:        return JsonResponse({"error": str(exc)}, status=400)
+payments/views.py:133:        "status": payment.status,
+payments/views.py:138:def stripe_webhook(request):
+payments/views.py:140:        return JsonResponse({"error": "POST required"}, status=405)
+payments/views.py:141:    signature = request.headers.get("Stripe-Signature", "")
+payments/views.py:143:        from .stripe_service import handle_stripe_webhook
+payments/views.py:144:        handle_stripe_webhook(request.body, signature)
+payments/views.py:146:        return JsonResponse({"received": False, "error": str(exc)}, status=400)
+payments/views.py:152:        return JsonResponse({"error": "POST required"}, status=405)
+payments/views.py:155:        return JsonResponse({"error": "Telegram authentication required"}, status=401)
+payments/views.py:166:        return JsonResponse({"error": str(exc)}, status=400)
+payments/views.py:173:        "status": payment.status,
+payments/tests.py:9:from .services import initialize_paystack_payment, verify_paystack_payment
+payments/tests.py:12:class PaystackPaymentTests(TestCase):
+payments/tests.py:14:        PAYSTACK_SECRET_KEY="sk_test_example",
+payments/tests.py:15:        PAYSTACK_CURRENCY="NGN",
+payments/tests.py:16:        PAYSTACK_ALLOWED_CURRENCIES=["NGN"],
+payments/tests.py:17:        PAYSTACK_CALLBACK_URL="https://example.com/payment/callback",
+payments/tests.py:19:    @patch("payments.services.requests.post")
+payments/tests.py:22:            raise_for_status=lambda: None,
+payments/tests.py:24:                "status": True,
+payments/tests.py:26:                    "authorization_url": "https://checkout.paystack.com/test",
+payments/tests.py:33:        payment = initialize_paystack_payment(
+payments/tests.py:36:        self.assertEqual(payment.provider, "paystack")
+payments/tests.py:37:        self.assertEqual(payment.status, Payment.PENDING)
+payments/tests.py:45:        PAYSTACK_SECRET_KEY="sk_test_example",
+payments/tests.py:46:        PAYSTACK_CURRENCY="NGN",
+payments/tests.py:47:        PAYSTACK_ALLOWED_CURRENCIES=["NGN"],
+payments/tests.py:48:        PAYSTACK_CALLBACK_URL="https://example.com/payment/callback",
+payments/tests.py:50:    @patch("payments.services.requests.get")
+payments/tests.py:53:            raise_for_status=lambda: None,
+payments/tests.py:55:                "status": True,
+payments/tests.py:57:                    "status": "success",
+payments/tests.py:66:            provider="paystack",
+payments/tests.py:72:        verify_paystack_payment("SHOPU-TEST")
+payments/tests.py:74:        verify_paystack_payment("SHOPU-TEST")
+payments/tests.py:82:            user=user, provider="paystack", provider_reference="GIFT-TEST",
+payments/tests.py:86:        card = GiftCard.objects.create(code="TESTGIFTCARD", currency="USD", initial_amount=Decimal("50"), remaining_amount=Decimal("50"), status=GiftCard.DISABLED)
+payments/tests.py:92:        self.assertEqual(card.status, GiftCard.ACTIVE)
+payments/tests.py:93:        self.assertEqual(purchase.status, GiftCardPurchase.PAID)
+payments/urls.py:3:    initialize_paystack,
+payments/urls.py:4:    verify_payment,
+payments/urls.py:5:    paystack_webhook,
+payments/urls.py:6:    initialize_stripe,
+payments/urls.py:7:    stripe_webhook,
+payments/urls.py:13:    path("paystack/initialize/", initialize_paystack),
+payments/urls.py:14:    path("paystack/verify/", verify_payment),
+payments/urls.py:15:    path("paystack/webhook/", paystack_webhook),
+payments/urls.py:16:    path("stripe/initialize/", initialize_stripe),
+payments/urls.py:17:    path("stripe/webhook/", stripe_webhook),
+
+===== WITHDRAWALS =====
+withdrawals/airwallex_service.py
+withdrawals/backup_20260827_024747/urls.py
+withdrawals/backup_20260827_024747/views.py
+withdrawals/backup_20260827_024747/test_provider_hardening.py
+withdrawals/mangopay_service.py
+withdrawals/provider_base.py
+withdrawals/__init__.py
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py
+withdrawals/nowpayments_service.py
+withdrawals/paystack_service.py
+withdrawals/migrations/0002_alter_withdrawalrequest_options_and_more.py
+withdrawals/migrations/0003_alter_withdrawalrequest_provider.py
+withdrawals/migrations/__init__.py
+withdrawals/migrations/0001_initial.py
+withdrawals/stripe_connect_service.py
+withdrawals/tests.py
+withdrawals/admin.py
+withdrawals/urls.py
+withdrawals/router.py
+withdrawals/services.py
+withdrawals/test_provider_hardening.py
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py
+withdrawals/backup_20260827_084811/urls.py
+withdrawals/backup_20260827_084811/views.py
+withdrawals/models.py
+withdrawals/views.py
+withdrawals/test_webhook_endpoints.py
+withdrawals/apps.py
+withdrawals/airwallex_service.py:12:class AirwallexProvider(PayoutProvider):
+withdrawals/airwallex_service.py:13:    name = "airwallex"
+withdrawals/airwallex_service.py:18:            "AIRWALLEX_BASE_URL",
+withdrawals/airwallex_service.py:19:            "https://api.airwallex.com",
+withdrawals/airwallex_service.py:24:            "AIRWALLEX_CLIENT_ID",
+withdrawals/airwallex_service.py:30:            "AIRWALLEX_API_KEY",
+withdrawals/airwallex_service.py:36:                "AIRWALLEX_CLIENT_ID/API_KEY are not configured."
+withdrawals/airwallex_service.py:39:        response = requests.post(
+withdrawals/airwallex_service.py:48:        if response.status_code >= 400:
+withdrawals/airwallex_service.py:56:        # Airwallex beneficiary creation is kept provider-specific.
+withdrawals/airwallex_service.py:61:                "Airwallex beneficiary details are required."
+withdrawals/airwallex_service.py:74:            "AIRWALLEX_BASE_URL",
+withdrawals/airwallex_service.py:75:            "https://api.airwallex.com",
+withdrawals/airwallex_service.py:86:                "Airwallex beneficiary_id is required."
+withdrawals/airwallex_service.py:93:        response = requests.post(
+withdrawals/airwallex_service.py:109:        if response.status_code >= 400:
+withdrawals/airwallex_service.py:123:                "Airwallex returned no transfer ID."
+withdrawals/airwallex_service.py:126:        mark_withdrawal_processing(
+withdrawals/airwallex_service.py:131:                "airwallex_transfer_id": transfer_id,
+withdrawals/airwallex_service.py:132:                "airwallex_request_id": reference,
+withdrawals/airwallex_service.py:138:    def verify_webhook(self, *, raw_body, signature="", headers=None):
+withdrawals/airwallex_service.py:141:            "AIRWALLEX_WEBHOOK_SECRET",
+withdrawals/airwallex_service.py:147:                "AIRWALLEX_WEBHOOK_SECRET is not configured."
+withdrawals/airwallex_service.py:167:                "Airwallex webhook signature is missing."
+withdrawals/airwallex_service.py:174:                "Invalid Airwallex webhook timestamp."
+withdrawals/airwallex_service.py:181:                "Airwallex webhook timestamp expired."
+withdrawals/airwallex_service.py:200:                "Invalid Airwallex webhook signature."
+withdrawals/airwallex_service.py:205:    def handle_webhook(self, *, payload):
+withdrawals/airwallex_service.py:237:                    "airwallex_event_id": event_id,
+withdrawals/airwallex_service.py:238:                    "airwallex_event": event_type,
+withdrawals/airwallex_service.py:243:        if "failed" in event_type or "cancelled" in event_type:
+withdrawals/airwallex_service.py:249:                    or "Airwallex payout failed."
+withdrawals/airwallex_service.py:252:                    "airwallex_event_id": event_id,
+withdrawals/airwallex_service.py:253:                    "airwallex_event": event_type,
+withdrawals/airwallex_service.py:261:provider = AirwallexProvider()
+withdrawals/backup_20260827_024747/urls.py:4:    create_paystack_recipient,
+withdrawals/backup_20260827_024747/urls.py:5:    create_paystack_withdrawal,
+withdrawals/backup_20260827_024747/urls.py:6:    paystack_transfer_webhook,
+withdrawals/backup_20260827_024747/urls.py:11:        "paystack/recipient/",
+withdrawals/backup_20260827_024747/urls.py:12:        create_paystack_recipient,
+withdrawals/backup_20260827_024747/urls.py:13:        name="paystack-recipient",
+withdrawals/backup_20260827_024747/urls.py:16:        "paystack/create/",
+withdrawals/backup_20260827_024747/urls.py:17:        create_paystack_withdrawal,
+withdrawals/backup_20260827_024747/urls.py:18:        name="paystack-withdrawal",
+withdrawals/backup_20260827_024747/urls.py:21:        "paystack/webhook/",
+withdrawals/backup_20260827_024747/urls.py:22:        paystack_transfer_webhook,
+withdrawals/backup_20260827_024747/urls.py:23:        name="paystack-transfer-webhook",
+withdrawals/backup_20260827_024747/views.py:9:from .paystack_service import (
+withdrawals/backup_20260827_024747/views.py:12:    handle_transfer_webhook,
+withdrawals/backup_20260827_024747/views.py:20:def create_paystack_recipient(request):
+withdrawals/backup_20260827_024747/views.py:51:            status=400,
+withdrawals/backup_20260827_024747/views.py:57:def create_paystack_withdrawal(request):
+withdrawals/backup_20260827_024747/views.py:67:                "Paystack recipient is required."
+withdrawals/backup_20260827_024747/views.py:78:            provider=WithdrawalRequest.PROVIDER_PAYSTACK,
+withdrawals/backup_20260827_024747/views.py:92:            "status": withdrawal.status,
+withdrawals/backup_20260827_024747/views.py:94:            "provider_status": data.get("status"),
+withdrawals/backup_20260827_024747/views.py:100:            status=400,
+withdrawals/backup_20260827_024747/views.py:106:def paystack_transfer_webhook(request):
+withdrawals/backup_20260827_024747/views.py:108:        "X-Paystack-Signature",
+withdrawals/backup_20260827_024747/views.py:115:            status=401,
+withdrawals/backup_20260827_024747/views.py:123:        handled = handle_transfer_webhook(payload)
+withdrawals/backup_20260827_024747/views.py:133:            status=400,
+withdrawals/backup_20260827_024747/test_provider_hardening.py:14:    mark_withdrawal_processing,
+withdrawals/backup_20260827_024747/test_provider_hardening.py:16:from .mangopay_service import MangopayProvider, PayoutProviderError
+withdrawals/backup_20260827_024747/test_provider_hardening.py:17:from .nowpayments_service import NOWPaymentsProvider
+withdrawals/backup_20260827_024747/test_provider_hardening.py:28:            provider="paystack",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:48:    def test_processing_reference_cannot_be_replaced(self):
+withdrawals/backup_20260827_024747/test_provider_hardening.py:53:            provider="paystack",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:56:        mark_withdrawal_processing(
+withdrawals/backup_20260827_024747/test_provider_hardening.py:65:            mark_withdrawal_processing(
+withdrawals/backup_20260827_024747/test_provider_hardening.py:75:            provider="paystack",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:78:        mark_withdrawal_processing(
+withdrawals/backup_20260827_024747/test_provider_hardening.py:103:            withdrawal.status,
+withdrawals/backup_20260827_024747/test_provider_hardening.py:104:            WithdrawalRequest.COMPLETED,
+withdrawals/backup_20260827_024747/test_provider_hardening.py:107:    def test_failed_withdrawal_return_is_idempotent(self):
+withdrawals/backup_20260827_024747/test_provider_hardening.py:112:            provider="paystack",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:117:            reason="provider failed",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:122:            reason="provider failed",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:135:            withdrawal.status,
+withdrawals/backup_20260827_024747/test_provider_hardening.py:136:            WithdrawalRequest.FAILED,
+withdrawals/backup_20260827_024747/test_provider_hardening.py:140:        MANGOPAY_CLIENT_ID="test-client",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:141:        MANGOPAY_API_KEY="test-key",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:143:    def test_mangopay_webhook_requires_trusted_boundary(self):
+withdrawals/backup_20260827_024747/test_provider_hardening.py:144:        provider = MangopayProvider()
+withdrawals/backup_20260827_024747/test_provider_hardening.py:147:            provider.verify_webhook(
+withdrawals/backup_20260827_024747/test_provider_hardening.py:153:            provider.verify_webhook(
+withdrawals/backup_20260827_024747/test_provider_hardening.py:156:                    "X-ShopU-Mangopay-Trusted": "1",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:162:        NOWPAYMENTS_API_KEY="test-key",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:164:    def test_nowpayments_webhook_rejects_wrong_provider(self):
+withdrawals/backup_20260827_024747/test_provider_hardening.py:169:            provider="paystack",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:172:        provider = NOWPaymentsProvider()
+withdrawals/backup_20260827_024747/test_provider_hardening.py:174:        handled = provider.handle_webhook(
+withdrawals/backup_20260827_024747/test_provider_hardening.py:177:                "status": "finished",
+withdrawals/backup_20260827_024747/test_provider_hardening.py:187:            withdrawal.status,
+withdrawals/backup_20260827_024747/test_provider_hardening.py:188:            WithdrawalRequest.PENDING,
+withdrawals/mangopay_service.py:9:class MangopayProvider(PayoutProvider):
+withdrawals/mangopay_service.py:10:    name = "mangopay"
+withdrawals/mangopay_service.py:15:            "MANGOPAY_CLIENT_ID",
+withdrawals/mangopay_service.py:21:            "MANGOPAY_API_KEY",
+withdrawals/mangopay_service.py:27:                "MANGOPAY_CLIENT_ID/API_KEY are not configured."
+withdrawals/mangopay_service.py:32:            "MANGOPAY_BASE_URL",
+withdrawals/mangopay_service.py:33:            "https://api.mangopay.com",
+withdrawals/mangopay_service.py:36:        response = requests.post(
+withdrawals/mangopay_service.py:43:        if response.status_code >= 400:
+withdrawals/mangopay_service.py:53:                "Mangopay bank-account details are required."
+withdrawals/mangopay_service.py:66:            "MANGOPAY_BASE_URL",
+withdrawals/mangopay_service.py:67:            "https://api.mangopay.com",
+withdrawals/mangopay_service.py:79:                "Mangopay wallet_id is required."
+withdrawals/mangopay_service.py:84:                "Mangopay bank_account_id is required."
+withdrawals/mangopay_service.py:104:        response = requests.post(
+withdrawals/mangopay_service.py:105:            f"{base}/v2.01/{getattr(settings, 'MANGOPAY_CLIENT_ID', '')}/payouts",
+withdrawals/mangopay_service.py:114:        if response.status_code >= 400:
+withdrawals/mangopay_service.py:125:                "Mangopay returned no payout ID."
+withdrawals/mangopay_service.py:128:        mark_withdrawal_processing(
+withdrawals/mangopay_service.py:133:                "mangopay_payout_id": payout_id,
+withdrawals/mangopay_service.py:134:                "mangopay_status": data.get("Status"),
+withdrawals/mangopay_service.py:140:    def verify_webhook(self, *, raw_body, signature="", headers=None):
+withdrawals/mangopay_service.py:142:        Mangopay Hook notifications do not provide an HMAC signature
+withdrawals/mangopay_service.py:143:        equivalent to Paystack/Stripe/NOWPayments.
+withdrawals/mangopay_service.py:156:            headers.get("X-ShopU-Mangopay-Trusted")
+withdrawals/mangopay_service.py:157:            or headers.get("x-shopu-mangopay-trusted")
+withdrawals/mangopay_service.py:163:                "Mangopay webhook requires trusted endpoint authentication."
+withdrawals/mangopay_service.py:168:    def handle_webhook(self, *, payload):
+withdrawals/mangopay_service.py:206:                    "mangopay_event": event_type,
+withdrawals/mangopay_service.py:207:                    "mangopay_resource_id": resource_id,
+withdrawals/mangopay_service.py:213:            "PAYOUT_NORMAL_FAILED",
+withdrawals/mangopay_service.py:214:            "INSTANT_PAYOUT_FAILED",
+withdrawals/mangopay_service.py:232:                reason="Mangopay payout failed.",
+withdrawals/mangopay_service.py:234:                    "mangopay_event": event_type,
+withdrawals/mangopay_service.py:235:                    "mangopay_resource_id": resource_id,
+withdrawals/mangopay_service.py:243:provider = MangopayProvider()
+withdrawals/provider_base.py:20:    def verify_webhook(self, *, raw_body, signature="", headers=None):
+withdrawals/provider_base.py:24:    def handle_webhook(self, *, payload):
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:16:    def verify_webhook(self, *, raw_body, signature="", headers=None):
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:19:        if self.name == "mangopay":
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:21:                raise PayoutProviderError("Webhook not trusted.")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:24:            raise PayoutProviderError("Webhook signature missing.")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:28:    def handle_webhook(self, *, payload):
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:33:class WithdrawalWebhookEndpointTests(TestCase):
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:38:            "status": "finished",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:43:            "stripe_connect": "stripe_connect/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:44:            "airwallex": "airwallex/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:45:            "mangopay": "mangopay/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:46:            "nowpayments": "nowpayments/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:55:                    "stripe_connect": "stripe_connect_webhook",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:56:                    "airwallex": "airwallex_webhook",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:57:                    "mangopay": "mangopay_webhook",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:58:                    "nowpayments": "nowpayments_webhook",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:63:    def test_stripe_webhook_dispatches_after_verification(self, get_provider):
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:64:        provider = FakeProvider("stripe_connect")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:68:            "/api/withdrawals/stripe_connect/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:71:            HTTP_STRIPE_SIGNATURE="test-signature",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:74:        self.assertEqual(response.status_code, 200)
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:79:    def test_airwallex_webhook_dispatches_after_verification(
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:83:        provider = FakeProvider("airwallex")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:87:            "/api/withdrawals/airwallex/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:94:        self.assertEqual(response.status_code, 200)
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:99:    def test_nowpayments_webhook_dispatches_after_verification(
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:103:        provider = FakeProvider("nowpayments")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:107:            "/api/withdrawals/nowpayments/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:110:            HTTP_X_NOWPAYMENTS_SIG="test-signature",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:113:        self.assertEqual(response.status_code, 200)
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:118:    def test_mangopay_requires_trusted_boundary(self, get_provider):
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:119:        provider = FakeProvider("mangopay")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:123:            "/api/withdrawals/mangopay/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:128:        self.assertEqual(response.status_code, 401)
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:133:    def test_missing_signature_rejected_for_stripe(self, get_provider):
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:134:        provider = FakeProvider("stripe_connect")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:138:            "/api/withdrawals/stripe_connect/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:143:        self.assertEqual(response.status_code, 401)
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:148:    def test_missing_signature_rejected_for_airwallex(self, get_provider):
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:149:        provider = FakeProvider("airwallex")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:153:            "/api/withdrawals/airwallex/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:158:        self.assertEqual(response.status_code, 401)
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:163:    def test_missing_signature_rejected_for_nowpayments(
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:167:        provider = FakeProvider("nowpayments")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:171:            "/api/withdrawals/nowpayments/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:176:        self.assertEqual(response.status_code, 401)
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:185:        provider = FakeProvider("stripe_connect")
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:189:            "/api/withdrawals/stripe_connect/webhook/",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:192:            HTTP_STRIPE_SIGNATURE="test-signature",
+withdrawals/backup_20260827_085815/test_webhook_endpoints.py:195:        self.assertEqual(response.status_code, 400)
+withdrawals/nowpayments_service.py:11:class NOWPaymentsProvider(PayoutProvider):
+withdrawals/nowpayments_service.py:12:    name = "nowpayments"
+withdrawals/nowpayments_service.py:17:            "NOWPAYMENTS_API_KEY",
+withdrawals/nowpayments_service.py:23:                "NOWPAYMENTS_API_KEY is not configured."
+withdrawals/nowpayments_service.py:43:        # NOWPayments is deliberately kept separate from fiat.
+withdrawals/nowpayments_service.py:56:                "NOWPayments payout address is required."
+withdrawals/nowpayments_service.py:61:                "crypto_currency is required for NOWPayments."
+withdrawals/nowpayments_service.py:66:            "NOWPAYMENTS_BASE_URL",
+withdrawals/nowpayments_service.py:67:            "https://api.nowpayments.io/v1",
+withdrawals/nowpayments_service.py:70:        response = requests.post(
+withdrawals/nowpayments_service.py:76:                    "NOWPAYMENTS_IPN_URL",
+withdrawals/nowpayments_service.py:92:        if response.status_code >= 400:
+withdrawals/nowpayments_service.py:106:                "NOWPayments returned no payout ID."
+withdrawals/nowpayments_service.py:109:        mark_withdrawal_processing(
+withdrawals/nowpayments_service.py:114:                "nowpayments_payout_id": payout_id,
+withdrawals/nowpayments_service.py:115:                "nowpayments_crypto_currency": crypto_currency,
+withdrawals/nowpayments_service.py:121:    def verify_webhook(self, *, raw_body, signature="", headers=None):
+withdrawals/nowpayments_service.py:124:            "NOWPAYMENTS_IPN_SECRET",
+withdrawals/nowpayments_service.py:130:                "NOWPAYMENTS_IPN_SECRET is not configured."
+withdrawals/nowpayments_service.py:137:            or headers.get("x-nowpayments-sig")
+withdrawals/nowpayments_service.py:138:            or headers.get("X-Nowpayments-Sig")
+withdrawals/nowpayments_service.py:144:                "NOWPayments IPN signature is missing."
+withdrawals/nowpayments_service.py:153:                "Invalid NOWPayments IPN JSON."
+withdrawals/nowpayments_service.py:173:                "Invalid NOWPayments IPN signature."
+withdrawals/nowpayments_service.py:178:    def handle_webhook(self, *, payload):
+withdrawals/nowpayments_service.py:196:                provider=WithdrawalRequest.PROVIDER_NOWPAYMENTS,
+withdrawals/nowpayments_service.py:204:        status = str(
+withdrawals/nowpayments_service.py:205:            payload.get("status", "")
+withdrawals/nowpayments_service.py:208:        if status in (
+withdrawals/nowpayments_service.py:211:            "completed",
+withdrawals/nowpayments_service.py:221:                    "nowpayments_status": status,
+withdrawals/nowpayments_service.py:226:        if status in (
+withdrawals/nowpayments_service.py:227:            "failed",
+withdrawals/nowpayments_service.py:235:                    or "NOWPayments payout failed."
+withdrawals/nowpayments_service.py:238:                    "nowpayments_status": status,
+withdrawals/nowpayments_service.py:246:provider = NOWPaymentsProvider()
+withdrawals/paystack_service.py:12:    mark_withdrawal_processing,
+withdrawals/paystack_service.py:17:PAYSTACK_BASE = "https://api.paystack.co"
+withdrawals/paystack_service.py:21:    secret = getattr(settings, "PAYSTACK_SECRET_KEY", "").strip()
+withdrawals/paystack_service.py:23:        raise RuntimeError("PAYSTACK_SECRET_KEY is not configured.")
+withdrawals/paystack_service.py:33:        f"{PAYSTACK_BASE}{path}",
+withdrawals/paystack_service.py:38:    response.raise_for_status()
+withdrawals/paystack_service.py:41:    if not payload.get("status"):
+withdrawals/paystack_service.py:42:        raise ValueError(payload.get("message") or "Paystack request failed.")
+withdrawals/paystack_service.py:109:    mark_withdrawal_processing(
+withdrawals/paystack_service.py:114:            "paystack_transfer_id": data.get("id"),
+withdrawals/paystack_service.py:115:            "paystack_transfer_code": data.get("transfer_code"),
+withdrawals/paystack_service.py:116:            "paystack_status": data.get("status"),
+withdrawals/paystack_service.py:124:    secret = getattr(settings, "PAYSTACK_SECRET_KEY", "").strip()
+withdrawals/paystack_service.py:139:def handle_transfer_webhook(payload):
+withdrawals/paystack_service.py:151:            provider=WithdrawalRequest.PROVIDER_PAYSTACK,
+withdrawals/paystack_service.py:164:            metadata={"paystack_event": event},
+withdrawals/paystack_service.py:168:    if event in ("transfer.failed", "transfer.reversed"):
+withdrawals/paystack_service.py:171:            reason=data.get("reason") or "Paystack transfer failed.",
+withdrawals/paystack_service.py:172:            metadata={"paystack_event": event},
+withdrawals/migrations/0002_alter_withdrawalrequest_options_and_more.py:20:            field=models.CharField(blank=True, choices=[('paystack', 'Paystack'), ('stripe', 'Stripe Connect')], max_length=40),
+withdrawals/migrations/0002_alter_withdrawalrequest_options_and_more.py:44:            name='status',
+withdrawals/migrations/0002_alter_withdrawalrequest_options_and_more.py:45:            field=models.CharField(choices=[('pending', 'Pending'), ('processing', 'Processing'), ('completed', 'Completed'), ('failed', 'Failed'), ('cancelled', 'Cancelled')], db_index=True, default='pending', max_length=20),
+withdrawals/migrations/0003_alter_withdrawalrequest_provider.py:16:            field=models.CharField(blank=True, choices=[('paystack', 'Paystack'), ('stripe_connect', 'Stripe Connect'), ('airwallex', 'Airwallex'), ('mangopay', 'Mangopay'), ('nowpayments', 'NOWPayments')], max_length=40),
+withdrawals/migrations/0001_initial.py:13:        ('destination_reference',models.CharField(max_length=255)),('status',models.CharField(choices=[('pending','Pending'),('processing','Processing'),('completed','Completed'),('failed','Failed'),('cancelled','Cancelled')],default='pending',max_length=20)),
+withdrawals/stripe_connect_service.py:10:    mark_withdrawal_processing,
+withdrawals/stripe_connect_service.py:14:class StripeConnectProvider(PayoutProvider):
+withdrawals/stripe_connect_service.py:15:    name = "stripe_connect"
+withdrawals/stripe_connect_service.py:18:        key = getattr(settings, "STRIPE_SECRET_KEY", "").strip()
+withdrawals/stripe_connect_service.py:22:                "STRIPE_SECRET_KEY is not configured."
+withdrawals/stripe_connect_service.py:31:            headers["Stripe-Account"] = account_id
+withdrawals/stripe_connect_service.py:42:                "A valid Stripe connected account is required."
+withdrawals/stripe_connect_service.py:55:                "Stripe Connect account is missing."
+withdrawals/stripe_connect_service.py:60:                "Invalid Stripe connected account."
+withdrawals/stripe_connect_service.py:67:        response = requests.post(
+withdrawals/stripe_connect_service.py:68:            "https://api.stripe.com/v1/payouts",
+withdrawals/stripe_connect_service.py:79:        if response.status_code >= 400:
+withdrawals/stripe_connect_service.py:90:                "Stripe returned no payout ID."
+withdrawals/stripe_connect_service.py:93:        mark_withdrawal_processing(
+withdrawals/stripe_connect_service.py:98:                "stripe_payout_id": payout_id,
+withdrawals/stripe_connect_service.py:99:                "stripe_status": data.get("status"),
+withdrawals/stripe_connect_service.py:100:                "stripe_account_id": account_id,
+withdrawals/stripe_connect_service.py:106:    def verify_webhook(self, *, raw_body, signature="", headers=None):
+withdrawals/stripe_connect_service.py:108:            import stripe
+withdrawals/stripe_connect_service.py:111:                "stripe package is not installed."
+withdrawals/stripe_connect_service.py:116:            "STRIPE_WEBHOOK_SECRET",
+withdrawals/stripe_connect_service.py:122:                "STRIPE_WEBHOOK_SECRET is not configured."
+withdrawals/stripe_connect_service.py:127:                "Stripe webhook signature is missing."
+withdrawals/stripe_connect_service.py:131:            return stripe.Webhook.construct_event(
+withdrawals/stripe_connect_service.py:138:                "Invalid Stripe webhook signature."
+withdrawals/stripe_connect_service.py:141:    def handle_webhook(self, *, payload):
+withdrawals/stripe_connect_service.py:161:                    "stripe_event": event_type,
+withdrawals/stripe_connect_service.py:162:                    "stripe_status": data.get("status"),
+withdrawals/stripe_connect_service.py:167:        if event_type == "payout.failed":
+withdrawals/stripe_connect_service.py:173:                    or "Stripe payout failed."
+withdrawals/stripe_connect_service.py:176:                    "stripe_event": event_type,
+withdrawals/stripe_connect_service.py:177:                    "stripe_status": data.get("status"),
+withdrawals/stripe_connect_service.py:185:provider = StripeConnectProvider()
+withdrawals/tests.py:55:    def pending_balance(self):
+withdrawals/tests.py:57:            name="WITHDRAWAL_PENDING",
+withdrawals/tests.py:73:        self.assertEqual(req.status, WithdrawalRequest.PENDING)
+withdrawals/tests.py:83:            self.pending_balance(),
+withdrawals/tests.py:124:            req.status,
+withdrawals/tests.py:125:            WithdrawalRequest.COMPLETED,
+withdrawals/tests.py:128:        pending_before = self.pending_balance()
+withdrawals/tests.py:138:            req.status,
+withdrawals/tests.py:139:            WithdrawalRequest.COMPLETED,
+withdrawals/tests.py:143:            self.pending_balance(),
+withdrawals/tests.py:144:            pending_before,
+withdrawals/tests.py:147:    def test_failed_withdrawal_returns_amount(self):
+withdrawals/tests.py:169:            req.status,
+withdrawals/tests.py:170:            WithdrawalRequest.FAILED,
+withdrawals/tests.py:179:            self.pending_balance(),
+withdrawals/tests.py:183:    def test_completed_withdrawal_cannot_be_reversed(self):
+withdrawals/tests.py:206:            req.status,
+withdrawals/tests.py:207:            WithdrawalRequest.COMPLETED,
+withdrawals/tests.py:272:                results.append(("failed", type(exc).__name__, str(exc)))
+withdrawals/admin.py:6:@admin.action(description="Mark selected withdrawals as processing")
+withdrawals/admin.py:7:def mark_processing(modeladmin, request, queryset):
+withdrawals/admin.py:11:    queryset.filter(status=WithdrawalRequest.PENDING).update(status=WithdrawalRequest.PROCESSING)
+withdrawals/admin.py:18:    for req in queryset.filter(status=WithdrawalRequest.PROCESSING):
+withdrawals/admin.py:29:    for req in queryset.filter(status__in=[WithdrawalRequest.PENDING, WithdrawalRequest.PROCESSING]):
+withdrawals/admin.py:37:    list_display = ("user", "amount", "fee", "currency", "method", "status", "created_at")
+withdrawals/admin.py:38:    list_filter = ("status", "method", "currency")
+withdrawals/admin.py:41:    actions = (mark_processing, complete, fail)
+withdrawals/urls.py:4:    create_paystack_recipient,
+withdrawals/urls.py:5:    create_paystack_withdrawal,
+withdrawals/urls.py:6:    paystack_transfer_webhook,
+withdrawals/urls.py:7:    stripe_connect_webhook,
+withdrawals/urls.py:8:    airwallex_webhook,
+withdrawals/urls.py:9:    mangopay_webhook,
+withdrawals/urls.py:10:    nowpayments_webhook,
+withdrawals/urls.py:15:        "paystack/recipient/",
+withdrawals/urls.py:16:        create_paystack_recipient,
+withdrawals/urls.py:17:        name="paystack-recipient",
+withdrawals/urls.py:20:        "paystack/create/",
+withdrawals/urls.py:21:        create_paystack_withdrawal,
+withdrawals/urls.py:22:        name="paystack-withdrawal",
+withdrawals/urls.py:25:        "paystack/webhook/",
+withdrawals/urls.py:26:        paystack_transfer_webhook,
+withdrawals/urls.py:27:        name="paystack-transfer-webhook",
+withdrawals/urls.py:30:        "stripe_connect/webhook/",
+withdrawals/urls.py:31:        stripe_connect_webhook,
+withdrawals/urls.py:32:        name="stripe-connect-webhook",
+withdrawals/urls.py:35:        "airwallex/webhook/",
+withdrawals/urls.py:36:        airwallex_webhook,
+withdrawals/urls.py:37:        name="airwallex-webhook",
+withdrawals/urls.py:40:        "mangopay/webhook/",
+withdrawals/urls.py:41:        mangopay_webhook,
+withdrawals/urls.py:42:        name="mangopay-webhook",
+withdrawals/urls.py:45:        "nowpayments/webhook/",
+withdrawals/urls.py:46:        nowpayments_webhook,
+withdrawals/urls.py:47:        name="nowpayments-webhook",
+withdrawals/router.py:7:    "paystack": "withdrawals.paystack_service",
+withdrawals/router.py:8:    "stripe_connect": "withdrawals.stripe_connect_service",
+withdrawals/router.py:9:    "airwallex": "withdrawals.airwallex_service",
+withdrawals/router.py:10:    "mangopay": "withdrawals.mangopay_service",
+withdrawals/router.py:11:    "nowpayments": "withdrawals.nowpayments_service",
+withdrawals/services.py:133:    pending, _ = LedgerAccount.objects.get_or_create(
+withdrawals/services.py:134:        name="WITHDRAWAL_PENDING",
+withdrawals/services.py:146:        {"account": pending, "direction": LedgerEntry.CREDIT, "amount": amount},
+withdrawals/services.py:186:def mark_withdrawal_processing(
+withdrawals/services.py:194:    if req.status == WithdrawalRequest.COMPLETED:
+withdrawals/services.py:197:    if req.status not in (
+withdrawals/services.py:198:        WithdrawalRequest.PENDING,
+withdrawals/services.py:199:        WithdrawalRequest.PROCESSING,
+withdrawals/services.py:201:        raise ValueError("Withdrawal cannot be moved to processing.")
+withdrawals/services.py:204:        req.status == WithdrawalRequest.PROCESSING
+withdrawals/services.py:210:            "Withdrawal is already processing with a different provider reference."
+withdrawals/services.py:213:    req.status = WithdrawalRequest.PROCESSING
+withdrawals/services.py:226:        "status",
+withdrawals/services.py:240:    if req.status == WithdrawalRequest.COMPLETED:
+withdrawals/services.py:243:    if req.status not in (
+withdrawals/services.py:244:        WithdrawalRequest.PENDING,
+withdrawals/services.py:245:        WithdrawalRequest.PROCESSING,
+withdrawals/services.py:247:        raise ValueError("Withdrawal cannot be completed from its current status.")
+withdrawals/services.py:249:    pending = LedgerAccount.objects.get(
+withdrawals/services.py:250:        name="WITHDRAWAL_PENDING",
+withdrawals/services.py:264:            {"account": pending, "direction": LedgerEntry.DEBIT, "amount": req.amount},
+withdrawals/services.py:274:    req.status = WithdrawalRequest.COMPLETED
+withdrawals/services.py:284:        "status",
+withdrawals/services.py:296:    if req.status in (
+withdrawals/services.py:297:        WithdrawalRequest.FAILED,
+withdrawals/services.py:298:        WithdrawalRequest.CANCELLED,
+withdrawals/services.py:302:    if req.status == WithdrawalRequest.COMPLETED:
+withdrawals/services.py:303:        raise ValueError("Completed withdrawal cannot be reversed here.")
+withdrawals/services.py:305:    pending = LedgerAccount.objects.get(
+withdrawals/services.py:306:        name="WITHDRAWAL_PENDING",
+withdrawals/services.py:312:        description=f"Return failed withdrawal #{req.pk}",
+withdrawals/services.py:316:            {"account": pending, "direction": LedgerEntry.DEBIT, "amount": req.amount},
+withdrawals/services.py:326:    req.status = WithdrawalRequest.FAILED
+withdrawals/services.py:336:        "status",
+withdrawals/test_provider_hardening.py:14:    mark_withdrawal_processing,
+withdrawals/test_provider_hardening.py:16:from .mangopay_service import MangopayProvider, PayoutProviderError
+withdrawals/test_provider_hardening.py:17:from .nowpayments_service import NOWPaymentsProvider
+withdrawals/test_provider_hardening.py:28:            provider="paystack",
+withdrawals/test_provider_hardening.py:48:    def test_processing_reference_cannot_be_replaced(self):
+withdrawals/test_provider_hardening.py:53:            provider="paystack",
+withdrawals/test_provider_hardening.py:56:        mark_withdrawal_processing(
+withdrawals/test_provider_hardening.py:65:            mark_withdrawal_processing(
+withdrawals/test_provider_hardening.py:75:            provider="paystack",
+withdrawals/test_provider_hardening.py:78:        mark_withdrawal_processing(
+withdrawals/test_provider_hardening.py:103:            withdrawal.status,
+withdrawals/test_provider_hardening.py:104:            WithdrawalRequest.COMPLETED,
+withdrawals/test_provider_hardening.py:107:    def test_failed_withdrawal_return_is_idempotent(self):
+withdrawals/test_provider_hardening.py:112:            provider="paystack",
+withdrawals/test_provider_hardening.py:117:            reason="provider failed",
+withdrawals/test_provider_hardening.py:122:            reason="provider failed",
+withdrawals/test_provider_hardening.py:135:            withdrawal.status,
+withdrawals/test_provider_hardening.py:136:            WithdrawalRequest.FAILED,
+withdrawals/test_provider_hardening.py:140:        MANGOPAY_CLIENT_ID="test-client",
+withdrawals/test_provider_hardening.py:141:        MANGOPAY_API_KEY="test-key",
+withdrawals/test_provider_hardening.py:143:    def test_mangopay_webhook_requires_trusted_boundary(self):
+withdrawals/test_provider_hardening.py:144:        provider = MangopayProvider()
+withdrawals/test_provider_hardening.py:147:            provider.verify_webhook(
+withdrawals/test_provider_hardening.py:153:            provider.verify_webhook(
+withdrawals/test_provider_hardening.py:156:                    "X-ShopU-Mangopay-Trusted": "1",
+withdrawals/test_provider_hardening.py:162:        NOWPAYMENTS_API_KEY="test-key",
+withdrawals/test_provider_hardening.py:164:    def test_nowpayments_webhook_rejects_wrong_provider(self):
+withdrawals/test_provider_hardening.py:169:            provider="paystack",
+withdrawals/test_provider_hardening.py:172:        provider = NOWPaymentsProvider()
+withdrawals/test_provider_hardening.py:174:        handled = provider.handle_webhook(
+withdrawals/test_provider_hardening.py:177:                "status": "finished",
+withdrawals/test_provider_hardening.py:187:            withdrawal.status,
+withdrawals/test_provider_hardening.py:188:            WithdrawalRequest.PENDING,
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:16:    def verify_webhook(self, *, raw_body, signature="", headers=None):
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:19:        if self.name == "mangopay":
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:21:                raise PayoutProviderError("Webhook not trusted.")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:24:            raise PayoutProviderError("Webhook signature missing.")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:28:    def handle_webhook(self, *, payload):
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:33:class WithdrawalWebhookEndpointTests(TestCase):
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:38:            "status": "finished",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:43:            "stripe_connect": "withdrawals/stripe_connect/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:44:            "airwallex": "withdrawals/airwallex/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:45:            "mangopay": "withdrawals/mangopay/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:46:            "nowpayments": "withdrawals/nowpayments/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:55:                    "stripe_connect": "stripe_connect_webhook",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:56:                    "airwallex": "airwallex_webhook",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:57:                    "mangopay": "mangopay_webhook",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:58:                    "nowpayments": "nowpayments_webhook",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:63:    def test_stripe_webhook_dispatches_after_verification(self, get_provider):
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:64:        provider = FakeProvider("stripe_connect")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:68:            "/api/withdrawals/stripe_connect/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:71:            HTTP_STRIPE_SIGNATURE="test-signature",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:74:        self.assertEqual(response.status_code, 200)
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:79:    def test_airwallex_webhook_dispatches_after_verification(
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:83:        provider = FakeProvider("airwallex")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:87:            "/api/withdrawals/airwallex/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:94:        self.assertEqual(response.status_code, 200)
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:99:    def test_nowpayments_webhook_dispatches_after_verification(
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:103:        provider = FakeProvider("nowpayments")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:107:            "/api/withdrawals/nowpayments/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:110:            HTTP_X_NOWPAYMENTS_SIG="test-signature",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:113:        self.assertEqual(response.status_code, 200)
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:118:    def test_mangopay_requires_trusted_boundary(self, get_provider):
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:119:        provider = FakeProvider("mangopay")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:123:            "/api/withdrawals/mangopay/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:128:        self.assertEqual(response.status_code, 401)
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:133:    def test_missing_signature_rejected_for_stripe(self, get_provider):
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:134:        provider = FakeProvider("stripe_connect")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:138:            "/api/withdrawals/stripe_connect/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:143:        self.assertEqual(response.status_code, 401)
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:148:    def test_missing_signature_rejected_for_airwallex(self, get_provider):
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:149:        provider = FakeProvider("airwallex")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:153:            "/api/withdrawals/airwallex/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:158:        self.assertEqual(response.status_code, 401)
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:163:    def test_missing_signature_rejected_for_nowpayments(
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:167:        provider = FakeProvider("nowpayments")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:171:            "/api/withdrawals/nowpayments/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:176:        self.assertEqual(response.status_code, 401)
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:185:        provider = FakeProvider("stripe_connect")
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:189:            "/api/withdrawals/stripe_connect/webhook/",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:192:            HTTP_STRIPE_SIGNATURE="test-signature",
+withdrawals/backup_20260827_084811/test_webhook_endpoints.py:195:        self.assertEqual(response.status_code, 400)
+withdrawals/backup_20260827_084811/urls.py:4:    create_paystack_recipient,
+withdrawals/backup_20260827_084811/urls.py:5:    create_paystack_withdrawal,
+withdrawals/backup_20260827_084811/urls.py:6:    paystack_transfer_webhook,
+withdrawals/backup_20260827_084811/urls.py:7:    stripe_connect_webhook,
+withdrawals/backup_20260827_084811/urls.py:8:    airwallex_webhook,
+withdrawals/backup_20260827_084811/urls.py:9:    mangopay_webhook,
+withdrawals/backup_20260827_084811/urls.py:10:    nowpayments_webhook,
+withdrawals/backup_20260827_084811/urls.py:15:        "paystack/recipient/",
+withdrawals/backup_20260827_084811/urls.py:16:        create_paystack_recipient,
+withdrawals/backup_20260827_084811/urls.py:17:        name="paystack-recipient",
+withdrawals/backup_20260827_084811/urls.py:20:        "paystack/create/",
+withdrawals/backup_20260827_084811/urls.py:21:        create_paystack_withdrawal,
+withdrawals/backup_20260827_084811/urls.py:22:        name="paystack-withdrawal",
+withdrawals/backup_20260827_084811/urls.py:25:        "paystack/webhook/",
+withdrawals/backup_20260827_084811/urls.py:26:        paystack_transfer_webhook,
+withdrawals/backup_20260827_084811/urls.py:27:        name="paystack-transfer-webhook",
+withdrawals/backup_20260827_084811/urls.py:30:        "stripe_connect/webhook/",
+withdrawals/backup_20260827_084811/urls.py:31:        stripe_connect_webhook,
+withdrawals/backup_20260827_084811/urls.py:32:        name="stripe-connect-webhook",
+withdrawals/backup_20260827_084811/urls.py:35:        "airwallex/webhook/",
+withdrawals/backup_20260827_084811/urls.py:36:        airwallex_webhook,
+withdrawals/backup_20260827_084811/urls.py:37:        name="airwallex-webhook",
+withdrawals/backup_20260827_084811/urls.py:40:        "mangopay/webhook/",
+withdrawals/backup_20260827_084811/urls.py:41:        mangopay_webhook,
+withdrawals/backup_20260827_084811/urls.py:42:        name="mangopay-webhook",
+withdrawals/backup_20260827_084811/urls.py:45:        "nowpayments/webhook/",
+withdrawals/backup_20260827_084811/urls.py:46:        nowpayments_webhook,
+withdrawals/backup_20260827_084811/urls.py:47:        name="nowpayments-webhook",
+withdrawals/backup_20260827_084811/views.py:9:from .paystack_service import (
+withdrawals/backup_20260827_084811/views.py:12:    handle_transfer_webhook,
+withdrawals/backup_20260827_084811/views.py:20:def create_paystack_recipient(request):
+withdrawals/backup_20260827_084811/views.py:51:            status=400,
+withdrawals/backup_20260827_084811/views.py:57:def create_paystack_withdrawal(request):
+withdrawals/backup_20260827_084811/views.py:67:                "Paystack recipient is required."
+withdrawals/backup_20260827_084811/views.py:78:            provider=WithdrawalRequest.PROVIDER_PAYSTACK,
+withdrawals/backup_20260827_084811/views.py:92:            "status": withdrawal.status,
+withdrawals/backup_20260827_084811/views.py:94:            "provider_status": data.get("status"),
+withdrawals/backup_20260827_084811/views.py:100:            status=400,
+withdrawals/backup_20260827_084811/views.py:106:def paystack_transfer_webhook(request):
+withdrawals/backup_20260827_084811/views.py:108:        "X-Paystack-Signature",
+withdrawals/backup_20260827_084811/views.py:115:            status=401,
+withdrawals/backup_20260827_084811/views.py:123:        handled = handle_transfer_webhook(payload)
+withdrawals/backup_20260827_084811/views.py:133:            status=400,
+withdrawals/backup_20260827_084811/views.py:137:def _provider_webhook_response(request, provider_name):
+withdrawals/backup_20260827_084811/views.py:148:    if provider_name == "stripe_connect":
+withdrawals/backup_20260827_084811/views.py:149:        signature = request.headers.get("Stripe-Signature", "")
+withdrawals/backup_20260827_084811/views.py:150:    elif provider_name == "airwallex":
+withdrawals/backup_20260827_084811/views.py:156:    elif provider_name == "nowpayments":
+withdrawals/backup_20260827_084811/views.py:158:            request.headers.get("x-nowpayments-sig")
+withdrawals/backup_20260827_084811/views.py:159:            or request.headers.get("X-Nowpayments-Sig")
+withdrawals/backup_20260827_084811/views.py:166:        provider.verify_webhook(
+withdrawals/backup_20260827_084811/views.py:174:            status=401,
+withdrawals/backup_20260827_084811/views.py:178:            {"ok": False, "error": "Webhook authentication failed."},
+withdrawals/backup_20260827_084811/views.py:179:            status=401,
+withdrawals/backup_20260827_084811/views.py:189:            status=400,
+withdrawals/backup_20260827_084811/views.py:193:        handled = provider.handle_webhook(
+withdrawals/backup_20260827_084811/views.py:198:            {"ok": False, "error": "Webhook processing failed."},
+withdrawals/backup_20260827_084811/views.py:199:            status=400,
+withdrawals/backup_20260827_084811/views.py:210:def stripe_connect_webhook(request):
+withdrawals/backup_20260827_084811/views.py:211:    return _provider_webhook_response(
+withdrawals/backup_20260827_084811/views.py:213:        "stripe_connect",
+withdrawals/backup_20260827_084811/views.py:219:def airwallex_webhook(request):
+withdrawals/backup_20260827_084811/views.py:220:    return _provider_webhook_response(
+withdrawals/backup_20260827_084811/views.py:222:        "airwallex",
+withdrawals/backup_20260827_084811/views.py:228:def mangopay_webhook(request):
+withdrawals/backup_20260827_084811/views.py:229:    return _provider_webhook_response(
+withdrawals/backup_20260827_084811/views.py:231:        "mangopay",
+withdrawals/backup_20260827_084811/views.py:237:def nowpayments_webhook(request):
+withdrawals/backup_20260827_084811/views.py:238:    return _provider_webhook_response(
+withdrawals/backup_20260827_084811/views.py:240:        "nowpayments",
+withdrawals/models.py:8:    PENDING = "pending"
+withdrawals/models.py:9:    PROCESSING = "processing"
+withdrawals/models.py:10:    COMPLETED = "completed"
+withdrawals/models.py:11:    FAILED = "failed"
+withdrawals/models.py:12:    CANCELLED = "cancelled"
+withdrawals/models.py:14:    STATUS_CHOICES = [
+withdrawals/models.py:15:        (PENDING, "Pending"),
+withdrawals/models.py:16:        (PROCESSING, "Processing"),
+withdrawals/models.py:17:        (COMPLETED, "Completed"),
+withdrawals/models.py:18:        (FAILED, "Failed"),
+withdrawals/models.py:19:        (CANCELLED, "Cancelled"),
+withdrawals/models.py:22:    PROVIDER_PAYSTACK = "paystack"
+withdrawals/models.py:23:    PROVIDER_STRIPE_CONNECT = "stripe_connect"
+withdrawals/models.py:24:    PROVIDER_AIRWALLEX = "airwallex"
+withdrawals/models.py:25:    PROVIDER_MANGOPAY = "mangopay"
+withdrawals/models.py:26:    PROVIDER_NOWPAYMENTS = "nowpayments"
+withdrawals/models.py:29:        (PROVIDER_PAYSTACK, "Paystack"),
+withdrawals/models.py:30:        (PROVIDER_STRIPE_CONNECT, "Stripe Connect"),
+withdrawals/models.py:31:        (PROVIDER_AIRWALLEX, "Airwallex"),
+withdrawals/models.py:32:        (PROVIDER_MANGOPAY, "Mangopay"),
+withdrawals/models.py:33:        (PROVIDER_NOWPAYMENTS, "NOWPayments"),
+withdrawals/models.py:79:    status = models.CharField(
+withdrawals/models.py:81:        choices=STATUS_CHOICES,
+withdrawals/models.py:82:        default=PENDING,
+withdrawals/models.py:102:            f"{self.amount} {self.currency} {self.status}"
+withdrawals/views.py:9:from .paystack_service import (
+withdrawals/views.py:12:    handle_transfer_webhook,
+withdrawals/views.py:20:def create_paystack_recipient(request):
+withdrawals/views.py:51:            status=400,
+withdrawals/views.py:57:def create_paystack_withdrawal(request):
+withdrawals/views.py:67:                "Paystack recipient is required."
+withdrawals/views.py:78:            provider=WithdrawalRequest.PROVIDER_PAYSTACK,
+withdrawals/views.py:92:            "status": withdrawal.status,
+withdrawals/views.py:94:            "provider_status": data.get("status"),
+withdrawals/views.py:100:            status=400,
+withdrawals/views.py:106:def paystack_transfer_webhook(request):
+withdrawals/views.py:108:        "X-Paystack-Signature",
+withdrawals/views.py:115:            status=401,
+withdrawals/views.py:123:        handled = handle_transfer_webhook(payload)
+withdrawals/views.py:133:            status=400,
+withdrawals/views.py:137:def _provider_webhook_response(request, provider_name):
+withdrawals/views.py:148:    if provider_name == "stripe_connect":
+withdrawals/views.py:149:        signature = request.headers.get("Stripe-Signature", "")
+withdrawals/views.py:150:    elif provider_name == "airwallex":
+withdrawals/views.py:156:    elif provider_name == "nowpayments":
+withdrawals/views.py:158:            request.headers.get("x-nowpayments-sig")
+withdrawals/views.py:159:            or request.headers.get("X-Nowpayments-Sig")
+withdrawals/views.py:166:        provider.verify_webhook(
+withdrawals/views.py:174:            status=401,
+withdrawals/views.py:178:            {"ok": False, "error": "Webhook authentication failed."},
+withdrawals/views.py:179:            status=401,
+withdrawals/views.py:189:            status=400,
+withdrawals/views.py:193:        handled = provider.handle_webhook(
+withdrawals/views.py:198:            {"ok": False, "error": "Webhook processing failed."},
+withdrawals/views.py:199:            status=400,
+withdrawals/views.py:210:def stripe_connect_webhook(request):
+withdrawals/views.py:211:    return _provider_webhook_response(
+withdrawals/views.py:213:        "stripe_connect",
+withdrawals/views.py:219:def airwallex_webhook(request):
+withdrawals/views.py:220:    return _provider_webhook_response(
+withdrawals/views.py:222:        "airwallex",
+withdrawals/views.py:228:def mangopay_webhook(request):
+withdrawals/views.py:229:    return _provider_webhook_response(
+withdrawals/views.py:231:        "mangopay",
+withdrawals/views.py:237:def nowpayments_webhook(request):
+withdrawals/views.py:238:    return _provider_webhook_response(
+withdrawals/views.py:240:        "nowpayments",
+withdrawals/test_webhook_endpoints.py:16:    def verify_webhook(self, *, raw_body, signature="", headers=None):
+withdrawals/test_webhook_endpoints.py:19:        if self.name == "mangopay":
+withdrawals/test_webhook_endpoints.py:21:                raise PayoutProviderError("Webhook not trusted.")
+withdrawals/test_webhook_endpoints.py:24:            raise PayoutProviderError("Webhook signature missing.")
+withdrawals/test_webhook_endpoints.py:28:    def handle_webhook(self, *, payload):
+withdrawals/test_webhook_endpoints.py:34:class WithdrawalWebhookEndpointTests(TestCase):
+withdrawals/test_webhook_endpoints.py:39:            "status": "finished",
+withdrawals/test_webhook_endpoints.py:44:            "stripe_connect": "stripe_connect/webhook/",
+withdrawals/test_webhook_endpoints.py:45:            "airwallex": "airwallex/webhook/",
+withdrawals/test_webhook_endpoints.py:46:            "mangopay": "mangopay/webhook/",
+withdrawals/test_webhook_endpoints.py:47:            "nowpayments": "nowpayments/webhook/",
+withdrawals/test_webhook_endpoints.py:56:                    "stripe_connect": "stripe_connect_webhook",
+withdrawals/test_webhook_endpoints.py:57:                    "airwallex": "airwallex_webhook",
+withdrawals/test_webhook_endpoints.py:58:                    "mangopay": "mangopay_webhook",
+withdrawals/test_webhook_endpoints.py:59:                    "nowpayments": "nowpayments_webhook",
+withdrawals/test_webhook_endpoints.py:64:    def test_stripe_webhook_dispatches_after_verification(self, get_provider):
+withdrawals/test_webhook_endpoints.py:65:        provider = FakeProvider("stripe_connect")
+withdrawals/test_webhook_endpoints.py:69:            "/api/withdrawals/stripe_connect/webhook/",
+withdrawals/test_webhook_endpoints.py:72:            HTTP_STRIPE_SIGNATURE="test-signature",
+withdrawals/test_webhook_endpoints.py:75:        self.assertEqual(response.status_code, 200)
+withdrawals/test_webhook_endpoints.py:80:    def test_airwallex_webhook_dispatches_after_verification(
+withdrawals/test_webhook_endpoints.py:84:        provider = FakeProvider("airwallex")
+withdrawals/test_webhook_endpoints.py:88:            "/api/withdrawals/airwallex/webhook/",
+withdrawals/test_webhook_endpoints.py:95:        self.assertEqual(response.status_code, 200)
+withdrawals/test_webhook_endpoints.py:100:    def test_nowpayments_webhook_dispatches_after_verification(
+withdrawals/test_webhook_endpoints.py:104:        provider = FakeProvider("nowpayments")
+withdrawals/test_webhook_endpoints.py:108:            "/api/withdrawals/nowpayments/webhook/",
+withdrawals/test_webhook_endpoints.py:111:            HTTP_X_NOWPAYMENTS_SIG="test-signature",
+withdrawals/test_webhook_endpoints.py:114:        self.assertEqual(response.status_code, 200)
+withdrawals/test_webhook_endpoints.py:119:    def test_mangopay_requires_trusted_boundary(self, get_provider):
+withdrawals/test_webhook_endpoints.py:120:        provider = FakeProvider("mangopay")
+withdrawals/test_webhook_endpoints.py:124:            "/api/withdrawals/mangopay/webhook/",
+withdrawals/test_webhook_endpoints.py:129:        self.assertEqual(response.status_code, 401)
+withdrawals/test_webhook_endpoints.py:134:    def test_missing_signature_rejected_for_stripe(self, get_provider):
+withdrawals/test_webhook_endpoints.py:135:        provider = FakeProvider("stripe_connect")
+withdrawals/test_webhook_endpoints.py:139:            "/api/withdrawals/stripe_connect/webhook/",
+withdrawals/test_webhook_endpoints.py:144:        self.assertEqual(response.status_code, 401)
+withdrawals/test_webhook_endpoints.py:149:    def test_missing_signature_rejected_for_airwallex(self, get_provider):
+withdrawals/test_webhook_endpoints.py:150:        provider = FakeProvider("airwallex")
+withdrawals/test_webhook_endpoints.py:154:            "/api/withdrawals/airwallex/webhook/",
+withdrawals/test_webhook_endpoints.py:159:        self.assertEqual(response.status_code, 401)
+withdrawals/test_webhook_endpoints.py:164:    def test_missing_signature_rejected_for_nowpayments(
+withdrawals/test_webhook_endpoints.py:168:        provider = FakeProvider("nowpayments")
+withdrawals/test_webhook_endpoints.py:172:            "/api/withdrawals/nowpayments/webhook/",
+withdrawals/test_webhook_endpoints.py:177:        self.assertEqual(response.status_code, 401)
+withdrawals/test_webhook_endpoints.py:186:        provider = FakeProvider("stripe_connect")
+withdrawals/test_webhook_endpoints.py:190:            "/api/withdrawals/stripe_connect/webhook/",
+withdrawals/test_webhook_endpoints.py:193:            HTTP_STRIPE_SIGNATURE="test-signature",
+withdrawals/test_webhook_endpoints.py:196:        self.assertEqual(response.status_code, 400)
+
+===== BANK TRANSFERS =====
+banktransfer/migrations/0001_initial.py
+banktransfer/migrations/__init__.py
+banktransfer/tests.py
+banktransfer/models.py
+banktransfer/apps.py
+banktransfer/admin.py
+banktransfer/__init__.py
+banktransfer/services.py
+banktransfer/migrations/0001_initial.py:6:    operations=[migrations.CreateModel(name='BankTransfer',fields=[('id',models.BigAutoField(auto_created=True,primary_key=True,serialize=False,verbose_name='ID')),('amount',models.DecimalField(decimal_places=2,max_digits=18)),('currency',models.CharField(default='USD',max_length=10)),('reference',models.CharField(max_length=160,unique=True)),('provider_reference',models.CharField(blank=True,max_length=160)),('status',models.CharField(choices=[('pending','Pending'),('confirmed','Confirmed'),('failed','Failed'),('expired','Expired')],default='pending',max_length=20)),('created_at',models.DateTimeField(auto_now_add=True)),('confirmed_at',models.DateTimeField(blank=True,null=True)),('user',models.ForeignKey(on_delete=models.deletion.PROTECT,related_name='bank_transfers',to=settings.AUTH_USER_MODEL))])]
+banktransfer/models.py:3:class BankTransfer(models.Model):
+banktransfer/models.py:4:    PENDING, CONFIRMED, FAILED, EXPIRED = "pending", "confirmed", "failed", "expired"
+banktransfer/models.py:5:    STATUS_CHOICES = [(x, x.title()) for x in (PENDING, CONFIRMED, FAILED, EXPIRED)]
+banktransfer/models.py:6:    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="bank_transfers")
+banktransfer/models.py:11:    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
+banktransfer/apps.py:2:class BanktransferConfig(AppConfig):
+banktransfer/apps.py:4:    name = "banktransfer"
+banktransfer/admin.py:2:from .models import BankTransfer
+banktransfer/admin.py:3:from .services import confirm_deposit, fail_transfer
+banktransfer/admin.py:6:@admin.action(description="Confirm selected bank transfers")
+banktransfer/admin.py:7:def confirm_transfers(modeladmin, request, queryset):
+banktransfer/admin.py:8:    if not request.user.is_superuser and not _allowed(request, BankTransfer, "approve"):
+banktransfer/admin.py:9:        messages.error(request, "You do not have permission to approve bank transfers.")
+banktransfer/admin.py:11:    for transfer in queryset.filter(status=BankTransfer.PENDING):
+banktransfer/admin.py:13:            confirm_deposit(transfer_id=transfer.pk)
+banktransfer/admin.py:15:            messages.error(request, f"Transfer #{transfer.pk}: {exc}")
+banktransfer/admin.py:17:@admin.action(description="Fail selected bank transfers")
+banktransfer/admin.py:18:def fail_transfers(modeladmin, request, queryset):
+banktransfer/admin.py:19:    if not request.user.is_superuser and not _allowed(request, BankTransfer, "reject"):
+banktransfer/admin.py:20:        messages.error(request, "You do not have permission to reject bank transfers.")
+banktransfer/admin.py:22:    for transfer in queryset.filter(status=BankTransfer.PENDING):
+banktransfer/admin.py:23:        fail_transfer(transfer.pk, "Rejected by staff")
+banktransfer/admin.py:25:@admin.register(BankTransfer)
+banktransfer/admin.py:26:class BankTransferAdmin(ShopUModelAdmin):
+banktransfer/admin.py:27:    list_display = ("user", "amount", "currency", "reference", "status", "created_at")
+banktransfer/admin.py:28:    list_filter = ("status", "currency")
+banktransfer/admin.py:30:    actions = (confirm_transfers, fail_transfers)
+banktransfer/services.py:5:from .models import BankTransfer
+banktransfer/services.py:14:    if not settings.bank_transfer_enabled:
+banktransfer/services.py:15:        raise ValueError("Bank transfer deposits are currently disabled.")
+banktransfer/services.py:21:    return BankTransfer.objects.create(user=user, amount=amount, currency=currency.upper(), reference=reference)
+banktransfer/services.py:25:def confirm_deposit(*, transfer_id, provider_reference=""):
+banktransfer/services.py:26:    transfer = BankTransfer.objects.select_for_update().get(pk=transfer_id)
+banktransfer/services.py:27:    if transfer.status == BankTransfer.CONFIRMED:
+banktransfer/services.py:28:        return transfer
+banktransfer/services.py:29:    if transfer.status != BankTransfer.PENDING:
+banktransfer/services.py:30:        raise ValueError("Only pending bank transfers can be confirmed.")
+banktransfer/services.py:31:    credit_cash(transfer.user, transfer.amount, transfer.currency,
+banktransfer/services.py:32:                reference=f"BANK_TRANSFER:{transfer.reference}",
+banktransfer/services.py:33:                metadata={"bank_transfer_id": transfer.pk, "provider_reference": provider_reference})
+banktransfer/services.py:34:    transfer.status = BankTransfer.CONFIRMED
+banktransfer/services.py:35:    transfer.provider_reference = provider_reference
+banktransfer/services.py:36:    transfer.confirmed_at = timezone.now()
+banktransfer/services.py:37:    transfer.save(update_fields=["status", "provider_reference", "confirmed_at"])
+banktransfer/services.py:38:    return transfer
+banktransfer/services.py:42:def fail_transfer(transfer_id, reason=""):
+banktransfer/services.py:43:    transfer = BankTransfer.objects.select_for_update().get(pk=transfer_id)
+banktransfer/services.py:44:    if transfer.status != BankTransfer.PENDING:
+banktransfer/services.py:45:        raise ValueError("Only pending bank transfers can be failed.")
+banktransfer/services.py:46:    transfer.status = BankTransfer.FAILED
+banktransfer/services.py:47:    transfer.provider_reference = reason[:160]
+banktransfer/services.py:48:    transfer.save(update_fields=["status", "provider_reference"])
+banktransfer/services.py:49:    return transfer
+
+===== GIFT CARDS =====
+giftcards/models.py
+giftcards/views.py
+giftcards/urls.py
+giftcards/services.py
+giftcards/apps.py
+giftcards/secure_codes.py
+giftcards/admin.py
+giftcards/migrations/0005_giftcardtopupsettings.py
+giftcards/migrations/0003_giftcardpurchase.py
+giftcards/migrations/0004_giftcardtopup.py
+giftcards/migrations/0001_initial.py
+giftcards/migrations/__init__.py
+giftcards/migrations/0002_multi_currency_precision.py
+giftcards/migrations/0006_giftcardtopupproof.py
+giftcards/__init__.py
+giftcards/tests.py
+giftcards/models.py:8:    ACTIVE, DISABLED, EXHAUSTED, EXPIRED = "active", "disabled", "exhausted", "expired"
+giftcards/models.py:9:    STATUS_CHOICES = [(x, x.title()) for x in (ACTIVE, DISABLED, EXHAUSTED, EXPIRED)]
+giftcards/models.py:14:    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=ACTIVE)
+giftcards/models.py:15:    expires_at = models.DateTimeField(null=True, blank=True)
+giftcards/models.py:29:    PENDING, PAID, FAILED, CANCELLED = "pending", "paid", "failed", "cancelled"
+giftcards/models.py:30:    STATUS_CHOICES = [(x, x.title()) for x in (PENDING, PAID, FAILED, CANCELLED)]
+giftcards/models.py:37:    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
+giftcards/models.py:48:    PENDING = "pending"
+giftcards/models.py:52:    STATUS_CHOICES = [(x, x.replace('_', ' ').title()) for x in (PENDING, APPROVED, REJECTED, NEEDS_INFO)]
+giftcards/models.py:64:    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING, db_index=True)
+giftcards/models.py:83:        return f"{self.brand} • {self.user.username} • {self.status}"
+giftcards/views.py:15:        return JsonResponse({"error": "POST required"}, status=405)
+giftcards/views.py:18:        return JsonResponse({"error": "Telegram authentication required"}, status=401)
+giftcards/views.py:28:        return JsonResponse({"error": str(exc)}, status=400)
+giftcards/views.py:35:        "status": purchase.status,
+giftcards/views.py:41:        return JsonResponse({"error": "POST required"}, status=405)
+giftcards/views.py:44:        return JsonResponse({"error": "Telegram authentication required"}, status=401)
+giftcards/views.py:58:        return JsonResponse({"error": str(exc)}, status=400)
+giftcards/views.py:62:        "status": topup.status,
+giftcards/services.py:8:def redeem_gift_card(code, user):
+giftcards/services.py:10:    if card.status != GiftCard.ACTIVE: raise ValueError("Gift card is not active")
+giftcards/services.py:11:    if card.expires_at and card.expires_at <= timezone.now():
+giftcards/services.py:12:        card.status = GiftCard.EXPIRED; card.save(update_fields=["status"])
+giftcards/services.py:13:        raise ValueError("Gift card has expired")
+giftcards/services.py:18:        reference=f"GIFT_CARD_REDEEM:{card.pk}:{user.pk}",
+giftcards/services.py:22:    card.remaining_amount = Decimal("0"); card.status = GiftCard.EXHAUSTED
+giftcards/services.py:23:    card.save(update_fields=["remaining_amount", "status"])
+giftcards/services.py:44:        status=GiftCard.DISABLED,
+giftcards/services.py:63:    if purchase.status == GiftCardPurchase.PAID:
+giftcards/services.py:65:    if purchase.status != GiftCardPurchase.PENDING:
+giftcards/services.py:66:        raise ValueError("Gift card purchase is not pending.")
+giftcards/services.py:68:    card.status = GiftCard.ACTIVE
+giftcards/services.py:69:    card.save(update_fields=["status"])
+giftcards/services.py:70:    purchase.status = GiftCardPurchase.PAID
+giftcards/services.py:72:    purchase.save(update_fields=["status", "paid_at"])
+giftcards/services.py:113:def review_gift_card_topup(*, topup_id, reviewer, status, approved_amount=None, approved_currency="", review_note=""):
+giftcards/services.py:115:    if topup.status == GiftCardTopUp.APPROVED:
+giftcards/services.py:117:    if status not in {GiftCardTopUp.APPROVED, GiftCardTopUp.REJECTED, GiftCardTopUp.NEEDS_INFO}:
+giftcards/services.py:118:        raise ValueError("Invalid gift-card review status.")
+giftcards/services.py:119:    if status == GiftCardTopUp.APPROVED:
+giftcards/services.py:140:    topup.status = status
+giftcards/services.py:145:        "status", "approved_amount", "approved_currency", "ledger_transaction_id",
+giftcards/services.py:151:            actor=reviewer, action=f"gift_card_topup.{status}",
+giftcards/admin.py:7:    list_display = ("code", "currency", "initial_amount", "remaining_amount", "status", "expires_at", "created_at")
+giftcards/admin.py:8:    list_filter = ("status", "currency")
+giftcards/admin.py:18:    list_display = ("id", "buyer", "gift_card", "amount", "currency", "status", "created_at", "paid_at")
+giftcards/admin.py:19:    list_filter = ("status", "currency")
+giftcards/admin.py:25:    list_display = ("id", "user", "brand", "code_last4", "claimed_amount", "claimed_currency", "status", "reviewed_by", "created_at")
+giftcards/admin.py:26:    list_filter = ("status", "brand", "claimed_currency")
+giftcards/admin.py:47:            "status",
+giftcards/admin.py:73:        requested_status = obj.status
+giftcards/admin.py:75:        if requested_status in {
+giftcards/admin.py:83:                status=requested_status,
+giftcards/admin.py:96:            obj.status = updated.status
+giftcards/migrations/0003_giftcardpurchase.py:18:                ("status", models.CharField(choices=[("pending", "Pending"), ("paid", "Paid"), ("failed", "Failed"), ("cancelled", "Cancelled")], default="pending", max_length=20)),
+giftcards/migrations/0004_giftcardtopup.py:23:                ("status", models.CharField(choices=[("pending", "Pending"), ("approved", "Approved"), ("rejected", "Rejected"), ("needs_info", "Needs Info")], db_index=True, default="pending", max_length=20)),
+giftcards/migrations/0001_initial.py:15:            ('status',models.CharField(choices=[('active','Active'),('disabled','Disabled'),('exhausted','Exhausted'),('expired','Expired')],default='active',max_length=20)),
+giftcards/migrations/0001_initial.py:16:            ('expires_at',models.DateTimeField(blank=True,null=True)),('created_at',models.DateTimeField(auto_now_add=True))]),
+giftcards/tests.py:13:    def test_submission_is_pending_and_does_not_credit_wallet(self):
+giftcards/tests.py:15:        self.assertEqual(topup.status, GiftCardTopUp.PENDING)
+giftcards/tests.py:20:        review_gift_card_topup(topup_id=topup.id, reviewer=self.staff, status=GiftCardTopUp.APPROVED, approved_amount=20, approved_currency="USD")
+giftcards/tests.py:22:        review_gift_card_topup(topup_id=topup.id, reviewer=self.staff, status=GiftCardTopUp.APPROVED, approved_amount=20, approved_currency="USD")
+
+===== REFERRALS =====
+referrals/models.py
+referrals/services.py
+referrals/migrations/0002_multi_currency_precision.py
+referrals/migrations/__init__.py
+referrals/migrations/0003_multi_currency_referral_totals.py
+referrals/migrations/0001_initial.py
+referrals/__init__.py
+referrals/tests.py
+referrals/apps.py
+referrals/admin.py
+referrals/models.py:40:    def generate_code():
+referrals/models.py:47:                candidate = self.generate_code()
+referrals/models.py:52:                raise RuntimeError("Unable to generate a unique referral code")
+referrals/models.py:58:class ReferralReward(models.Model):
+referrals/models.py:59:    referral = models.ForeignKey(ReferralProfile, on_delete=models.PROTECT, related_name="rewards")
+referrals/models.py:60:    referrer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="referral_rewards")
+referrals/models.py:61:    referred_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="referral_rewards_generated")
+referrals/models.py:62:    order = models.OneToOneField("marketplace.Order", on_delete=models.PROTECT, related_name="referral_reward")
+referrals/models.py:72:        constraints = [models.UniqueConstraint(fields=("referral", "sequence"), name="unique_referral_reward_sequence")]
+referrals/models.py:76:        return f"Referral reward #{self.pk} - order {self.order_id}"
+referrals/services.py:7:from .models import ReferralProfile, ReferralProgramSettings, ReferralReward
+referrals/services.py:50:    if order.status != Order.COMPLETED or ReferralReward.objects.filter(order=order).exists():
+referrals/services.py:62:    reward = _quantize_currency(base * rate / Decimal("100"), currency)
+referrals/services.py:64:    if reward <= 0:
+referrals/services.py:71:        name="REFERRAL_REWARDS", currency=currency,
+referrals/services.py:75:        description=f"Referral reward #{sequence} for order #{order.id}",
+referrals/services.py:76:        reference=f"REFERRAL_REWARD:{order.id}",
+referrals/services.py:78:            {"account": expense, "direction": LedgerEntry.DEBIT, "amount": reward},
+referrals/services.py:79:            {"account": wallet, "direction": LedgerEntry.CREDIT, "amount": reward},
+referrals/services.py:90:    ReferralReward.objects.create(
+referrals/services.py:93:        base_amount=base, commission_percent=rate, amount=reward,
+referrals/services.py:97:    totals[currency] = str(Decimal(str(totals.get(currency, "0"))) + reward)
+referrals/migrations/0002_multi_currency_precision.py:8:        migrations.AlterField(model_name="referralreward", name="base_amount", field=models.DecimalField(decimal_places=8, max_digits=24)),
+referrals/migrations/0002_multi_currency_precision.py:9:        migrations.AlterField(model_name="referralreward", name="amount", field=models.DecimalField(decimal_places=8, max_digits=24)),
+referrals/migrations/0003_multi_currency_referral_totals.py:7:        rewards = profile.rewards.all()
+referrals/migrations/0003_multi_currency_referral_totals.py:9:        for reward in rewards:
+referrals/migrations/0003_multi_currency_referral_totals.py:10:            code = reward.currency.upper()
+referrals/migrations/0003_multi_currency_referral_totals.py:11:            totals[code] = str(__import__('decimal').Decimal(totals.get(code, "0")) + reward.amount)
+referrals/migrations/0001_initial.py:44:            name="ReferralReward",
+referrals/migrations/0001_initial.py:54:                ("order", models.OneToOneField(on_delete=django.db.models.deletion.PROTECT, related_name="referral_reward", to="marketplace.order")),
+referrals/migrations/0001_initial.py:55:                ("referral", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="rewards", to="referrals.referralprofile")),
+referrals/migrations/0001_initial.py:56:                ("referred_user", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="referral_rewards_generated", to=settings.AUTH_USER_MODEL)),
+referrals/migrations/0001_initial.py:57:                ("referrer", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="referral_rewards", to=settings.AUTH_USER_MODEL)),
+referrals/migrations/0001_initial.py:62:            model_name="referralreward",
+referrals/migrations/0001_initial.py:63:            constraint=models.UniqueConstraint(fields=("referral", "sequence"), name="unique_referral_reward_sequence"),
+referrals/tests.py:11:from .models import ReferralProfile, ReferralProgramSettings, ReferralReward
+referrals/tests.py:41:            currency="USD", status=Order.PENDING,
+referrals/tests.py:47:    def test_first_ten_transactions_are_rewarded(self):
+referrals/tests.py:52:        self.assertEqual(ReferralReward.objects.filter(referrer=self.referrer).count(), 10)
+referrals/tests.py:57:        self.assertEqual(ReferralReward.objects.filter(referrer=self.referrer).count(), 10)
+referrals/tests.py:76:            currency="USD", status=Order.PENDING,
+referrals/admin.py:3:from .models import ReferralProfile, ReferralProgramSettings, ReferralReward
+referrals/admin.py:15:@admin.register(ReferralReward)
+referrals/admin.py:16:class ReferralRewardAdmin(ShopUModelAdmin):
+referrals/admin.py:19:    readonly_fields = [f.name for f in ReferralReward._meta.fields]
+
+===== TELEGRAM / NOTIFICATIONS =====
+telegram_integration/telegram_bot.py
+telegram_integration/migrations/__init__.py
+telegram_integration/migrations/0001_initial.py
+telegram_integration/migrations/0002_notifications.py
+telegram_integration/apps.py
+telegram_integration/marketplace_commands.py
+telegram_integration/cli.py
+telegram_integration/admin.py
+telegram_integration/management/__init__.py
+telegram_integration/management/commands/__init__.py
+telegram_integration/miniapp_api.py
+telegram_integration/shopu_auth.py
+telegram_integration/tests.py
+telegram_integration/__init__.py
+telegram_integration/handlers.py
+telegram_integration/miniapp_urls.py
+telegram_integration/models.py
+telegram_integration/bot.py
+telegram_integration/views.py
+telegram_integration/telegram_bot.py:8:from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+telegram_integration/telegram_bot.py:9:from telegram.ext import Application, CommandHandler, ContextTypes
+telegram_integration/telegram_bot.py:12:from .bot import get_or_create_telegram_user, apply_start_referral, get_referral_link
+telegram_integration/telegram_bot.py:19:    user = get_or_create_telegram_user(tg_user.id, tg_user.username)
+telegram_integration/telegram_bot.py:54:    user = get_or_create_telegram_user(
+telegram_integration/telegram_bot.py:79:    user = get_or_create_telegram_user(tg_user.id, tg_user.username)
+telegram_integration/telegram_bot.py:81:        settings, "TELEGRAM_BOT_USERNAME", ""
+telegram_integration/telegram_bot.py:86:            "Set TELEGRAM_BOT_USERNAME in the bot environment."
+telegram_integration/telegram_bot.py:111:    token = getattr(settings, "TELEGRAM_BOT_TOKEN", "").strip()
+telegram_integration/telegram_bot.py:113:        raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
+telegram_integration/telegram_bot.py:115:        raise RuntimeError(
+telegram_integration/migrations/0001_initial.py:18:            name='TelegramAccount',
+telegram_integration/migrations/0001_initial.py:21:                ('telegram_user_id', models.BigIntegerField(unique=True)),
+telegram_integration/migrations/0001_initial.py:26:                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='telegram_account', to=settings.AUTH_USER_MODEL)),
+telegram_integration/migrations/0002_notifications.py:5:    dependencies=[('telegram_integration','0001_initial')]
+telegram_integration/migrations/0002_notifications.py:6:    operations=[migrations.CreateModel(name='Notification',fields=[
+telegram_integration/migrations/0002_notifications.py:9:        ('user',models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,related_name='notifications',to=settings.AUTH_USER_MODEL)),
+telegram_integration/apps.py:4:class TelegramIntegrationConfig(AppConfig):
+telegram_integration/apps.py:6:    name = 'telegram_integration'
+telegram_integration/marketplace_commands.py:14:from .bot import get_or_create_telegram_user
+telegram_integration/marketplace_commands.py:43:    except (TypeError, ValueError):
+telegram_integration/marketplace_commands.py:64:def command_wallet(telegram_id, username=None):
+telegram_integration/marketplace_commands.py:65:    user = get_or_create_telegram_user(
+telegram_integration/marketplace_commands.py:66:        telegram_id,
+telegram_integration/marketplace_commands.py:79:    telegram_id,
+telegram_integration/marketplace_commands.py:83:    user = get_or_create_telegram_user(
+telegram_integration/marketplace_commands.py:84:        telegram_id,
+telegram_integration/marketplace_commands.py:116:def command_accept_terms(telegram_id, username=None):
+telegram_integration/marketplace_commands.py:120:    user = get_or_create_telegram_user(telegram_id, username)
+telegram_integration/marketplace_commands.py:128:def command_buy(telegram_id, product_id, username=None):
+telegram_integration/marketplace_commands.py:129:    user = get_or_create_telegram_user(telegram_id, username)
+telegram_integration/marketplace_commands.py:132:    except (TypeError, ValueError):
+telegram_integration/marketplace_commands.py:141:    except PermissionError:
+telegram_integration/marketplace_commands.py:143:    except ValueError as e:
+telegram_integration/marketplace_commands.py:159:    telegram_id,
+telegram_integration/marketplace_commands.py:162:    user = get_or_create_telegram_user(
+telegram_integration/marketplace_commands.py:163:        telegram_id,
+telegram_integration/marketplace_commands.py:191:    telegram_id,
+telegram_integration/marketplace_commands.py:195:    user = get_or_create_telegram_user(
+telegram_integration/marketplace_commands.py:196:        telegram_id,
+telegram_integration/marketplace_commands.py:202:    except (TypeError, ValueError):
+telegram_integration/cli.py:20:    print("LOCAL TELEGRAM MARKETPLACE TEST CLIENT")
+telegram_integration/cli.py:24:    telegram_id = 999999999
+telegram_integration/cli.py:28:        telegram_id,
+telegram_integration/cli.py:37:        telegram_id,
+telegram_integration/cli.py:43:        telegram_id,
+telegram_integration/admin.py:3:from .models import TelegramAccount,Notification
+telegram_integration/admin.py:4:@admin.register(TelegramAccount)
+telegram_integration/admin.py:5:class TelegramAccountAdmin(ShopUModelAdmin): list_display=('telegram_user_id','username','user','verified','created_at'); search_fields=('username','user__username','telegram_user_id'); list_filter=('verified',)
+telegram_integration/admin.py:6:@admin.register(Notification)
+telegram_integration/admin.py:7:class NotificationAdmin(ShopUModelAdmin): list_display=('user','title','kind','read','created_at'); search_fields=('user__username','title','message'); list_filter=('kind','read')
+telegram_integration/miniapp_api.py:22:from .models import Notification
+telegram_integration/miniapp_api.py:45:        raise ValueError(f'{label.title()} must be 5 MB or smaller.')
+telegram_integration/miniapp_api.py:52:            raise ValueError(f'{label.title()} must be JPEG, PNG, or WebP.')
+telegram_integration/miniapp_api.py:54:            raise ValueError(f'{label.title()} dimensions are too large.')
+telegram_integration/miniapp_api.py:56:    except ValueError:
+telegram_integration/miniapp_api.py:59:        raise ValueError(f'Invalid {label}.')
+telegram_integration/miniapp_api.py:88:    if not user: return JsonResponse({'error':'Telegram authentication required'},status=401)
+telegram_integration/miniapp_api.py:89:    unread=Notification.objects.filter(user=user,read=False).count()
+telegram_integration/miniapp_api.py:90:    return JsonResponse({'app':'ShopU','user':_profile_json(request,user),'is_support_agent':SupportAgent.objects.filter(user=user, active=True).exists(),'wallets':[], 'unread_notifications':unread})
+telegram_integration/miniapp_api.py:102:    if not user: return JsonResponse({'error':'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:107:    if request.method != 'POST': return JsonResponse({'error':'POST required'}, status=405)
+telegram_integration/miniapp_api.py:109:    if not user: return JsonResponse({'error':'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:112:        if not upload: raise ValueError('Choose a profile photo first.')
+telegram_integration/miniapp_api.py:119:        return JsonResponse({'error':str(exc)}, status=400)
+telegram_integration/miniapp_api.py:137:        return JsonResponse({'error': 'GET required'}, status=405)
+telegram_integration/miniapp_api.py:142:            {'error': 'Telegram authentication required'},
+telegram_integration/miniapp_api.py:153:            {'error': 'No active buyer terms are configured'},
+telegram_integration/miniapp_api.py:178:        return JsonResponse({'error': 'POST required'}, status=405)
+telegram_integration/miniapp_api.py:183:            {'error': 'Telegram authentication required'},
+telegram_integration/miniapp_api.py:194:            {'error': 'No active buyer terms are configured'},
+telegram_integration/miniapp_api.py:202:            {'error': 'You must explicitly accept the current Buyer Terms.'},
+telegram_integration/miniapp_api.py:227:        return JsonResponse({'error': 'POST required'}, status=405)
+telegram_integration/miniapp_api.py:230:        return JsonResponse({'error': 'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:251:        return JsonResponse({'error': str(e)}, status=400)
+telegram_integration/miniapp_api.py:258:        return JsonResponse({'error': 'POST required'}, status=405)
+telegram_integration/miniapp_api.py:261:        return JsonResponse({'error': 'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:269:    except PermissionError as e:
+telegram_integration/miniapp_api.py:270:        return JsonResponse({'error': str(e)}, status=403)
+telegram_integration/miniapp_api.py:271:    except ValueError as e:
+telegram_integration/miniapp_api.py:272:        return JsonResponse({'error': str(e)}, status=400)
+telegram_integration/miniapp_api.py:275:        Notification.objects.create(
+telegram_integration/miniapp_api.py:281:        Notification.objects.create(
+telegram_integration/miniapp_api.py:298:        return JsonResponse({'error': 'POST required'}, status=405)
+telegram_integration/miniapp_api.py:301:        return JsonResponse({'error': 'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:311:    except ValueError as e:
+telegram_integration/miniapp_api.py:312:        return JsonResponse({'error': str(e)}, status=404)
+telegram_integration/miniapp_api.py:313:    Notification.objects.create(
+telegram_integration/miniapp_api.py:327:        return JsonResponse({'error': 'POST required'}, status=405)
+telegram_integration/miniapp_api.py:330:        return JsonResponse({'error': 'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:333:    except PermissionError as e:
+telegram_integration/miniapp_api.py:334:        return JsonResponse({'error': str(e)}, status=403)
+telegram_integration/miniapp_api.py:335:    except ValueError as e:
+telegram_integration/miniapp_api.py:336:        return JsonResponse({'error': str(e)}, status=400)
+telegram_integration/miniapp_api.py:338:    Notification.objects.create(
+telegram_integration/miniapp_api.py:353:        return JsonResponse({'error': 'POST required'}, status=405)
+telegram_integration/miniapp_api.py:356:        return JsonResponse({'error': 'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:362:    except ValueError as e:
+telegram_integration/miniapp_api.py:363:        return JsonResponse({'error': str(e)}, status=400)
+telegram_integration/miniapp_api.py:364:    Notification.objects.create(
+telegram_integration/miniapp_api.py:370:    Notification.objects.create(
+telegram_integration/miniapp_api.py:384:    if not user:return JsonResponse({'error':'Telegram authentication required'},status=401)
+telegram_integration/miniapp_api.py:431:    if request.method!='POST':return JsonResponse({'error':'POST required'},status=405)
+telegram_integration/miniapp_api.py:433:    if not seller:return JsonResponse({'error':'Telegram authentication required'},status=401)
+telegram_integration/miniapp_api.py:435:    except: return JsonResponse({'error':'Invalid amount'},status=400)
+telegram_integration/miniapp_api.py:436:    if amount<=0:return JsonResponse({'error':'Amount must be greater than zero'},status=400)
+telegram_integration/miniapp_api.py:445:            {'error': 'Telegram authentication required'},
+telegram_integration/miniapp_api.py:457:        return JsonResponse({'error':'Escrow not found'},status=404)
+telegram_integration/miniapp_api.py:462:        return JsonResponse({'error':'Escrow not found'},status=404)
+telegram_integration/miniapp_api.py:479:    if request.method!='POST': return JsonResponse({'error':'POST required'},status=405)
+telegram_integration/miniapp_api.py:481:    if not buyer: return JsonResponse({'error':'Telegram authentication required'},status=401)
+telegram_integration/miniapp_api.py:483:    except Exception as e: return JsonResponse({'error':str(e)},status=400)
+telegram_integration/miniapp_api.py:484:    e=PrivateEscrow.objects.get(escrow_id=escrow_id); Notification.objects.create(user=e.seller,kind='escrow',title='Private escrow funded',message=f'{e.escrow_id} is funded and protected.')
+telegram_integration/miniapp_api.py:489:    if request.method!='POST': return JsonResponse({'error':'POST required'},status=405)
+telegram_integration/miniapp_api.py:491:    if not buyer: return JsonResponse({'error':'Telegram authentication required'},status=401)
+telegram_integration/miniapp_api.py:493:    if not e:return JsonResponse({'error':'Escrow not found'},status=404)
+telegram_integration/miniapp_api.py:495:    except Exception as ex:return JsonResponse({'error':str(ex)},status=400)
+telegram_integration/miniapp_api.py:496:    Notification.objects.create(user=e.seller,kind='escrow',title='Private escrow released',message=f'{e.escrow_id} was released by the buyer.')
+telegram_integration/miniapp_api.py:503:        return JsonResponse({'error': 'POST required'}, status=405)
+telegram_integration/miniapp_api.py:506:        return JsonResponse({'error': 'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:513:        return JsonResponse({'error': 'Escrow unavailable'}, status=404)
+telegram_integration/miniapp_api.py:515:        return JsonResponse({'error': 'Seller cannot join as buyer'}, status=400)
+telegram_integration/miniapp_api.py:518:    Notification.objects.create(
+telegram_integration/miniapp_api.py:530:        return JsonResponse({'error': 'POST required'}, status=405)
+telegram_integration/miniapp_api.py:533:        return JsonResponse({'error': 'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:539:            {'error': 'Private escrow not found or not funded'}, status=404
+telegram_integration/miniapp_api.py:557:        Notification.objects.create(
+telegram_integration/miniapp_api.py:570:        return JsonResponse({'error': 'Vendor not found'}, status=404)
+telegram_integration/miniapp_api.py:609:        return JsonResponse({'error': 'POST required'}, status=405)
+telegram_integration/miniapp_api.py:612:        return JsonResponse({'error': 'Telegram authentication required'}, status=401)
+telegram_integration/miniapp_api.py:615:        return JsonResponse({'error': 'Vendor not found'}, status=404)
+telegram_integration/miniapp_api.py:617:        return JsonResponse({'error': 'You cannot report your own seller profile.'}, status=400)
+telegram_integration/miniapp_api.py:620:        return JsonResponse({'error': 'This account is not registered as a seller.'}, status=400)
+telegram_integration/miniapp_api.py:623:        return JsonResponse({'error': 'Please provide at least 20 characters describing the issue.'}, status=400)
+telegram_integration/miniapp_api.py:625:        return JsonResponse({'error': 'Complaint is too long.'}, status=400)
+telegram_integration/miniapp_api.py:632:            return JsonResponse({'error': 'The selected order does not belong to this seller.'}, status=400)
+telegram_integration/miniapp_api.py:639:        return JsonResponse({'error': 'You already have a recent open complaint against this seller.'}, status=409)
+telegram_integration/miniapp_api.py:647:    if request.method!='POST':return JsonResponse({'error':'POST required'},status=405)
+telegram_integration/miniapp_api.py:649:    if not buyer:return JsonResponse({'error':'Telegram authentication required'},status=401)
+telegram_integration/miniapp_api.py:651:    except Exception as e:return JsonResponse({'error':str(e)},status=400)
+telegram_integration/miniapp_api.py:656:    if request.method!='POST':return JsonResponse({'error':'POST required'},status=405)
+telegram_integration/miniapp_api.py:658:    if not buyer:return JsonResponse({'error':'Telegram authentication required'},status=401)
+telegram_integration/miniapp_api.py:660:    except Exception as e:return JsonResponse({'error':str(e)},status=400)
+telegram_integration/miniapp_api.py:663:def notifications(request):
+telegram_integration/miniapp_api.py:665:    if not user:return JsonResponse({'error':'Telegram authentication required'},status=401)
+telegram_integration/miniapp_api.py:666:    return JsonResponse({'notifications':[{'id':n.id,'title':n.title,'message':n.message,'kind':n.kind,'read':n.read,'created_at':n.created_at.isoformat()} for n in Notification.objects.filter(user=user).order_by('-id')[:100]]})
+telegram_integration/miniapp_api.py:669:def mark_notification_read(request,notification_id):
+telegram_integration/miniapp_api.py:671:    if not user:return JsonResponse({'error':'Telegram authentication required'},status=401)
+telegram_integration/miniapp_api.py:672:    Notification.objects.filter(id=notification_id,user=user).update(read=True)
+telegram_integration/shopu_auth.py:17:    token = getattr(settings, "TELEGRAM_BOT_TOKEN", "")
+telegram_integration/shopu_auth.py:40:            getattr(settings, "TELEGRAM_INIT_DATA_MAX_AGE_SECONDS", 3600)
+telegram_integration/shopu_auth.py:43:            getattr(settings, "TELEGRAM_INIT_DATA_MAX_FUTURE_SECONDS", 300)
+telegram_integration/shopu_auth.py:60:        telegram_id = int(tid)
+telegram_integration/shopu_auth.py:63:        from .models import TelegramAccount
+telegram_integration/shopu_auth.py:66:        # Telegram numeric ID is the authoritative identity.
+telegram_integration/shopu_auth.py:67:        # Never attach a new Telegram identity to an existing Django
+telegram_integration/shopu_auth.py:70:            TelegramAccount.objects.filter(telegram_user_id=telegram_id)
+telegram_integration/shopu_auth.py:78:            # Recover a previously linked profile if the TelegramAccount
+telegram_integration/shopu_auth.py:81:                Profile.objects.filter(telegram_id=tid)
+telegram_integration/shopu_auth.py:102:                    telegram_id=tid,
+telegram_integration/shopu_auth.py:105:            account = TelegramAccount.objects.update_or_create(
+telegram_integration/shopu_auth.py:106:                telegram_user_id=telegram_id,
+telegram_integration/shopu_auth.py:116:        profile.telegram_id = tid
+telegram_integration/shopu_auth.py:118:        profile.save(update_fields=["telegram_id", "last_seen_at"])
+telegram_integration/shopu_auth.py:121:    except (ValueError, TypeError, json.JSONDecodeError, KeyError):
+telegram_integration/tests.py:12:from .models import TelegramAccount
+telegram_integration/tests.py:16:class TelegramAuthenticationSecurityTests(TestCase):
+telegram_integration/tests.py:20:    def make_init_data(self, telegram_id=987654321, username="testtg",
+telegram_integration/tests.py:26:            "id": telegram_id,
+telegram_integration/tests.py:59:        TELEGRAM_BOT_TOKEN=BOT_TOKEN,
+telegram_integration/tests.py:60:        TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600,
+telegram_integration/tests.py:61:        TELEGRAM_INIT_DATA_MAX_FUTURE_SECONDS=300,
+telegram_integration/tests.py:70:            user.telegram_account.telegram_user_id,
+telegram_integration/tests.py:73:        self.assertEqual(user.profile.telegram_id, "987654321")
+telegram_integration/tests.py:76:        TELEGRAM_BOT_TOKEN=BOT_TOKEN,
+telegram_integration/tests.py:77:        TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600,
+telegram_integration/tests.py:86:        TELEGRAM_BOT_TOKEN=BOT_TOKEN,
+telegram_integration/tests.py:87:        TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600,
+telegram_integration/tests.py:97:        TELEGRAM_BOT_TOKEN=BOT_TOKEN,
+telegram_integration/tests.py:98:        TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600,
+telegram_integration/tests.py:99:        TELEGRAM_INIT_DATA_MAX_FUTURE_SECONDS=300,
+telegram_integration/tests.py:109:        TELEGRAM_BOT_TOKEN=BOT_TOKEN,
+telegram_integration/tests.py:110:        TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600,
+telegram_integration/tests.py:119:        TELEGRAM_BOT_TOKEN=BOT_TOKEN,
+telegram_integration/tests.py:120:        TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600,
+telegram_integration/tests.py:133:            telegram_id=555111222,
+telegram_integration/tests.py:142:            authenticated.telegram_account.telegram_user_id,
+telegram_integration/tests.py:146:            TelegramAccount.objects.filter(
+telegram_integration/tests.py:147:                telegram_user_id=555111222,
+telegram_integration/tests.py:153:        TELEGRAM_BOT_TOKEN=BOT_TOKEN,
+telegram_integration/tests.py:154:        TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600,
+telegram_integration/tests.py:156:    def test_existing_telegram_id_returns_same_user(self):
+telegram_integration/tests.py:159:                telegram_id=444333222,
+telegram_integration/tests.py:166:                telegram_id=444333222,
+telegram_integration/tests.py:173:            TelegramAccount.objects.filter(
+telegram_integration/tests.py:174:                telegram_user_id=444333222
+telegram_integration/tests.py:180:        TELEGRAM_BOT_TOKEN=BOT_TOKEN,
+telegram_integration/tests.py:181:        TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600,
+telegram_integration/tests.py:183:    def test_missing_telegram_id_rejected(self):
+telegram_integration/handlers.py:2:    get_or_create_telegram_user,
+telegram_integration/handlers.py:11:    telegram_user_id,
+telegram_integration/handlers.py:14:    user = get_or_create_telegram_user(
+telegram_integration/handlers.py:15:        telegram_user_id,
+telegram_integration/handlers.py:79:    telegram_user_id,
+telegram_integration/handlers.py:82:    user = get_or_create_telegram_user(
+telegram_integration/handlers.py:83:        telegram_user_id,
+telegram_integration/handlers.py:97:    telegram_user_id,
+telegram_integration/handlers.py:100:    user = get_or_create_telegram_user(
+telegram_integration/handlers.py:101:        telegram_user_id,
+telegram_integration/miniapp_urls.py:7: path('',index,name='miniapp'),path('bootstrap/',miniapp_api.bootstrap),path('products/',miniapp_api.products),path('profile/',miniapp_api.profile),path('profile/photo/',miniapp_api.profile_photo),path('listing-policy/',miniapp_api.listing_policy),path('buyer-terms/',miniapp_api.buyer_terms),path('buyer-terms/accept/',miniapp_api.accept_buyer_terms),path('products/create/',miniapp_api.create_product_api),path('products/<int:product_id>/buy/',miniapp_api.buy_product),path('orders/',miniapp_api.orders),path('orders/<int:order_id>/deliver/',miniapp_api.mark_delivered),path('orders/<int:order_id>/confirm/',miniapp_api.confirm_order),path('orders/<int:order_id>/dispute/',miniapp_api.dispute_order),path('vendor/<int:seller_id>/',miniapp_api.vendor_profile),path('vendor/<int:seller_id>/report/',miniapp_api.report_vendor),path('reviews/create/',miniapp_api.create_review_api),path('reviews/<int:review_id>/edit/',miniapp_api.edit_review_api),path('notifications/',miniapp_api.notifications),path('notifications/<int:notification_id>/read/',miniapp_api.mark_notification_read),path('escrow/create/',miniapp_api.create_private_escrow),path('escrow/<str:escrow_id>/',miniapp_api.private_escrow),path('escrow/<str:escrow_id>/join/',miniapp_api.join_private_escrow),path('escrow/<str:escrow_id>/fund/',miniapp_api.fund_private),path('escrow/<str:escrow_id>/deliver/',miniapp_api.mark_private_delivered),path('escrow/<str:escrow_id>/release/',miniapp_api.release_private),
+telegram_integration/models.py:4:class TelegramAccount(models.Model):
+telegram_integration/models.py:5:    telegram_user_id = models.BigIntegerField(unique=True)
+telegram_integration/models.py:10:    user = models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='telegram_account')
+telegram_integration/models.py:12:class Notification(models.Model):
+telegram_integration/models.py:13:    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='notifications')
+telegram_integration/bot.py:14:def get_or_create_telegram_user(telegram_user_id, username=None):
+telegram_integration/bot.py:15:    from .models import TelegramAccount
+telegram_integration/bot.py:18:        TelegramAccount.objects.filter(telegram_user_id=telegram_user_id)
+telegram_integration/bot.py:29:    base = username or f"telegram_{telegram_user_id}"
+telegram_integration/bot.py:32:        clean = f"telegram_{telegram_user_id}"
+telegram_integration/bot.py:41:    TelegramAccount.objects.create(
+telegram_integration/bot.py:43:        telegram_user_id=telegram_user_id,
+
+===== VENDOR VERIFICATION =====
+vendor_verification/api.py
+vendor_verification/models.py
+vendor_verification/tests.py
+vendor_verification/services.py
+vendor_verification/trust.py
+vendor_verification/__init__.py
+vendor_verification/admin.py
+vendor_verification/urls.py
+vendor_verification/migrations/0005_rename_vendor_ver_seller__b1a0d7_idx_vendor_veri_seller__3839e5_idx_and_more.py
+vendor_verification/migrations/0002_verificationprogramsettings.py
+vendor_verification/migrations/0004_trust_signals.py
+vendor_verification/migrations/__init__.py
+vendor_verification/migrations/0003_dynamic_verification_steps.py
+vendor_verification/migrations/0001_initial.py
+vendor_verification/apps.py
+vendor_verification/api.py:5:from .models import VendorVerification, VerificationProgramSettings
+vendor_verification/api.py:6:from .services import apply_for_verification
+vendor_verification/api.py:18:    verification = VendorVerification.objects.filter(seller=seller).first()
+vendor_verification/api.py:23:    reviews = __import__("reviews.models", fromlist=["Review"]).Review.objects.filter(seller=seller, visible=True)
+vendor_verification/api.py:25:    avg = reviews.aggregate(value=Avg("rating"))["value"]
+vendor_verification/api.py:28:        "stats": {"completed_transactions": completed, "dispute_count": disputes, "dispute_rate_percent": round((disputes / completed) * 100, 2) if completed else 0, "review_count": reviews.count(), "average_rating": round(float(avg), 2) if avg else None},
+vendor_verification/api.py:30:        "verification": {
+vendor_verification/api.py:31:            "status": verification.status if verification else "unverified",
+vendor_verification/api.py:32:            "badge": verification.badge if verification else "",
+vendor_verification/api.py:33:            "badge_level": verification.badge_level if verification else "unverified",
+vendor_verification/api.py:34:            "identity_verified": verification.identity_verified if verification else False,
+vendor_verification/api.py:35:            "business_verified": verification.business_verified if verification else False,
+vendor_verification/api.py:36:            "payment_history_verified": verification.payment_history_verified if verification else False,
+vendor_verification/api.py:37:            "transaction_history_verified": verification.transaction_history_verified if verification else False,
+vendor_verification/api.py:43:def verification_settings(request):
+vendor_verification/api.py:44:    program = VerificationProgramSettings.get_solo()
+vendor_verification/api.py:61:        verification = apply_for_verification(seller)
+vendor_verification/api.py:66:        "status": verification.status,
+vendor_verification/models.py:5:class VendorVerification(models.Model):
+vendor_verification/models.py:6:    PENDING = "pending"
+vendor_verification/models.py:8:    TRUSTED = "trusted"
+vendor_verification/models.py:9:    SUSPENDED = "suspended"
+vendor_verification/models.py:10:    REVOKED = "revoked"
+vendor_verification/models.py:13:        (PENDING, "Pending"),
+vendor_verification/models.py:15:        (TRUSTED, "Trusted Vendor"),
+vendor_verification/models.py:16:        (SUSPENDED, "Suspended"),
+vendor_verification/models.py:17:        (REVOKED, "Revoked"),
+vendor_verification/models.py:23:        related_name="vendor_verification",
+vendor_verification/models.py:29:        default=PENDING,
+vendor_verification/models.py:44:        related_name="vendor_verifications_performed",
+vendor_verification/models.py:46:    trusted_by = models.ForeignKey(
+vendor_verification/models.py:55:    trusted_at = models.DateTimeField(null=True, blank=True)
+vendor_verification/models.py:56:    revoked_at = models.DateTimeField(null=True, blank=True)
+vendor_verification/models.py:57:    trusted_reason = models.TextField(blank=True)
+vendor_verification/models.py:64:    def is_trusted(self):
+vendor_verification/models.py:65:        return self.status == self.TRUSTED
+vendor_verification/models.py:71:            self.TRUSTED: "Trusted Vendor",
+vendor_verification/models.py:72:            self.SUSPENDED: "Suspended",
+vendor_verification/models.py:73:            self.REVOKED: "Verification Revoked",
+vendor_verification/models.py:80:            self.TRUSTED: "trusted",
+vendor_verification/models.py:81:            self.SUSPENDED: "suspended",
+vendor_verification/models.py:82:            self.REVOKED: "revoked",
+vendor_verification/models.py:83:            self.PENDING: "pending",
+vendor_verification/models.py:84:        }.get(self.status, "pending")
+vendor_verification/models.py:117:    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="vendor_complaints_reviewed")
+vendor_verification/models.py:153:class VerificationProgramSettings(models.Model):
+vendor_verification/models.py:154:    """Admin-controlled optional vendor verification process."""
+vendor_verification/models.py:168:        step_model = globals().get("VerificationStep")
+vendor_verification/models.py:193:        return "ShopU Vendor Verification Settings"
+vendor_verification/models.py:195:class VerificationStep(models.Model):
+vendor_verification/models.py:196:    """Admin-defined verification eligibility/evidence step. Selling never depends on these steps."""
+vendor_verification/models.py:204:        ("manual", "Manual review"),
+vendor_verification/models.py:219:class VerificationStepResult(models.Model):
+vendor_verification/models.py:220:    PENDING = "pending"
+vendor_verification/models.py:223:    STATUS_CHOICES = [(PENDING, "Pending"), (PASSED, "Passed"), (FAILED, "Failed")]
+vendor_verification/models.py:224:    verification = models.ForeignKey(VendorVerification, on_delete=models.CASCADE, related_name="step_results")
+vendor_verification/models.py:225:    step = models.ForeignKey(VerificationStep, on_delete=models.PROTECT, related_name="results")
+vendor_verification/models.py:226:    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
+vendor_verification/models.py:228:    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="verification_step_reviews")
+vendor_verification/models.py:229:    reviewed_at = models.DateTimeField(null=True, blank=True)
+vendor_verification/models.py:230:    reviewer_note = models.TextField(blank=True)
+vendor_verification/models.py:233:        constraints = [models.UniqueConstraint(fields=("verification", "step"), name="unique_vendor_verification_step")]
+vendor_verification/tests.py:4:from .models import VendorVerification, VerificationProgramSettings
+vendor_verification/tests.py:5:from .services import apply_for_verification, set_vendor_status
+vendor_verification/tests.py:8:class VendorVerificationTests(TestCase):
+vendor_verification/tests.py:9:    def test_verification_is_optional_for_seller(self):
+vendor_verification/tests.py:11:        self.assertFalse(VendorVerification.objects.filter(seller=seller).exists())
+vendor_verification/tests.py:15:        settings = VerificationProgramSettings.get_solo()
+vendor_verification/tests.py:23:        verification = apply_for_verification(seller)
+vendor_verification/tests.py:24:        self.assertEqual(verification.status, VendorVerification.PENDING)
+vendor_verification/tests.py:26:        verification.identity_verified = True
+vendor_verification/tests.py:27:        verification.save(update_fields=["identity_verified"])
+vendor_verification/tests.py:29:            seller, VendorVerification.VERIFIED, reviewer=seller
+vendor_verification/tests.py:31:        self.assertEqual(approved.status, VendorVerification.VERIFIED)
+vendor_verification/tests.py:34:        from .models import VerificationStep, VerificationStepResult
+vendor_verification/tests.py:35:        from .services import apply_for_verification, set_step_result
+vendor_verification/tests.py:37:        step = VerificationStep.objects.create(key="phone_check", name="Phone ownership", required=True, enabled=True)
+vendor_verification/tests.py:38:        verification = apply_for_verification(seller)
+vendor_verification/tests.py:39:        self.assertTrue(VerificationStepResult.objects.filter(verification=verification, step=step).exists())
+vendor_verification/tests.py:40:        self.assertFalse(__import__('vendor_verification.services', fromlist=['verification_requirements_met']).verification_requirements_met(seller))
+vendor_verification/tests.py:41:        set_step_result(verification_id=verification.id, step_id=step.id, status=VerificationStepResult.PASSED, reviewer=seller)
+vendor_verification/tests.py:56:    def test_trusted_badge_is_admin_reliability_designation(self):
+vendor_verification/tests.py:57:        from .models import VendorVerification
+vendor_verification/tests.py:60:        verification = set_vendor_status(
+vendor_verification/tests.py:61:            self.seller, VendorVerification.TRUSTED, reviewer=self.buyer, note="Consistently reliable seller"
+vendor_verification/tests.py:63:        self.assertEqual(verification.status, VendorVerification.TRUSTED)
+vendor_verification/tests.py:64:        self.assertEqual(vendor_badges(self.seller)["primary"]["key"], "trusted")
+vendor_verification/tests.py:66:    def test_verified_badge_requires_verification_process(self):
+vendor_verification/tests.py:67:        from .models import VendorVerification
+vendor_verification/tests.py:70:            set_vendor_status(self.seller, VendorVerification.VERIFIED, reviewer=self.buyer)
+vendor_verification/tests.py:86:        VendorComplaint.objects.create(seller=self.seller, reporter=self.buyer, description="A complaint that needs review", status=VendorComplaint.OPEN)
+vendor_verification/tests.py:91:        from .models import VendorVerification
+vendor_verification/tests.py:94:        verification = VendorVerification.objects.create(seller=self.seller, caution_override=False)
+vendor_verification/tests.py:96:        verification.caution_override = True
+vendor_verification/tests.py:97:        verification.save(update_fields=["caution_override", "updated_at"])
+vendor_verification/services.py:5:from .models import VendorVerification, VerificationProgramSettings, VerificationStep, VerificationStepResult
+vendor_verification/services.py:8:def get_vendor_verification(seller):
+vendor_verification/services.py:9:    return VendorVerification.objects.filter(seller=seller).first()
+vendor_verification/services.py:12:def sync_step_results(verification):
+vendor_verification/services.py:13:    for step in VerificationStep.objects.filter(enabled=True):
+vendor_verification/services.py:14:        VerificationStepResult.objects.get_or_create(verification=verification, step=step)
+vendor_verification/services.py:17:def apply_for_verification(seller):
+vendor_verification/services.py:18:    program = VerificationProgramSettings.get_solo()
+vendor_verification/services.py:20:        raise ValueError("Vendor verification is currently unavailable.")
+vendor_verification/services.py:21:    verification, _ = VendorVerification.objects.get_or_create(seller=seller, defaults={"status": VendorVerification.PENDING})
+vendor_verification/services.py:22:    if verification.status in (VendorVerification.VERIFIED, VendorVerification.TRUSTED):
+vendor_verification/services.py:23:        return verification
+vendor_verification/services.py:24:    if verification.status == VendorVerification.SUSPENDED:
+vendor_verification/services.py:26:    verification.status = VendorVerification.PENDING
+vendor_verification/services.py:27:    verification.save(update_fields=["status", "updated_at"])
+vendor_verification/services.py:28:    sync_step_results(verification)
+vendor_verification/services.py:29:    return verification
+vendor_verification/services.py:32:def verification_requirements_met(seller):
+vendor_verification/services.py:33:    program = VerificationProgramSettings.get_solo()
+vendor_verification/services.py:34:    verification = get_vendor_verification(seller)
+vendor_verification/services.py:36:    if not verification or not program.enabled:
+vendor_verification/services.py:47:    sync_step_results(verification)
+vendor_verification/services.py:49:    required_steps = VerificationStep.objects.filter(
+vendor_verification/services.py:55:        VerificationStepResult.objects.filter(
+vendor_verification/services.py:56:            verification=verification,
+vendor_verification/services.py:58:            status=VerificationStepResult.PASSED,
+vendor_verification/services.py:64:def set_step_result(*, verification_id, step_id, status, reviewer, evidence="", reviewer_note=""):
+vendor_verification/services.py:65:    verification = VendorVerification.objects.select_for_update().get(pk=verification_id)
+vendor_verification/services.py:66:    step = VerificationStep.objects.get(pk=step_id, enabled=True)
+vendor_verification/services.py:67:    if status not in {VerificationStepResult.PENDING, VerificationStepResult.PASSED, VerificationStepResult.FAILED}:
+vendor_verification/services.py:68:        raise ValueError("Invalid verification step status.")
+vendor_verification/services.py:69:    result, _ = VerificationStepResult.objects.select_for_update().get_or_create(verification=verification, step=step)
+vendor_verification/services.py:72:    result.reviewer_note = str(reviewer_note or "")[:5000]
+vendor_verification/services.py:73:    result.reviewed_by = reviewer
+vendor_verification/services.py:74:    result.reviewed_at = timezone.now()
+vendor_verification/services.py:79:def set_vendor_status(seller, status, *, reviewer=None, identity_verified=None, business_verified=None, payment_history_verified=None, transaction_history_verified=None, note=""):
+vendor_verification/services.py:80:    verification = VendorVerification.objects.filter(seller=seller).first()
+vendor_verification/services.py:82:    if verification is None:
+vendor_verification/services.py:83:        if status == VendorVerification.VERIFIED:
+vendor_verification/services.py:85:                "The vendor must apply for verification before being marked Verified."
+vendor_verification/services.py:88:        verification = VendorVerification.objects.create(
+vendor_verification/services.py:90:            status=VendorVerification.PENDING,
+vendor_verification/services.py:93:    if status == VendorVerification.VERIFIED:
+vendor_verification/services.py:94:        if verification.status not in (
+vendor_verification/services.py:95:            VendorVerification.PENDING,
+vendor_verification/services.py:96:            VendorVerification.VERIFIED,
+vendor_verification/services.py:99:                "The vendor is not eligible for verification."
+vendor_verification/services.py:104:            setattr(verification, field, value)
+vendor_verification/services.py:106:        verification.notes = note
+vendor_verification/services.py:107:    verification.save()
+vendor_verification/services.py:108:    sync_step_results(verification)
+vendor_verification/services.py:109:    # Synchronize legacy boolean verification fields with dynamic steps.
+vendor_verification/services.py:111:        "identity": verification.identity_verified,
+vendor_verification/services.py:112:        "business": verification.business_verified,
+vendor_verification/services.py:113:        "payment_history": verification.payment_history_verified,
+vendor_verification/services.py:114:        "transaction_history": verification.transaction_history_verified,
+vendor_verification/services.py:129:            step = VerificationStep.objects.filter(key=key, enabled=True).first()
+vendor_verification/services.py:132:                    verification_id=verification.pk,
+vendor_verification/services.py:134:                    status=VerificationStepResult.PASSED,
+vendor_verification/services.py:135:                    reviewer=reviewer,
+vendor_verification/services.py:138:            step = VerificationStep.objects.filter(key=key, enabled=True).first()
+vendor_verification/services.py:141:                    verification_id=verification.pk,
+vendor_verification/services.py:143:                    status=VerificationStepResult.FAILED,
+vendor_verification/services.py:144:                    reviewer=reviewer,
+vendor_verification/services.py:147:    if status == VendorVerification.VERIFIED:
+vendor_verification/services.py:148:        if not verification_requirements_met(seller):
+vendor_verification/services.py:150:        verification.verified_at = now
+vendor_verification/services.py:151:        verification.revoked_at = None
+vendor_verification/services.py:152:        verification.verified_by = reviewer
+vendor_verification/services.py:153:    elif status == VendorVerification.TRUSTED:
+vendor_verification/services.py:154:        # Trusted is an admin reliability designation, not an identity-verification substitute.
+vendor_verification/services.py:155:        # The admin must decide that the seller is reliable; verification requirements remain
+vendor_verification/services.py:157:        verification.trusted_at = now
+vendor_verification/services.py:158:        verification.trusted_by = reviewer
+vendor_verification/services.py:159:        verification.revoked_at = None
+vendor_verification/services.py:161:            verification.trusted_reason = note
+vendor_verification/services.py:162:    elif status == VendorVerification.REVOKED:
+vendor_verification/services.py:163:        verification.revoked_at = now
+vendor_verification/services.py:164:        verification.verified_by = reviewer
+vendor_verification/services.py:165:    elif status == VendorVerification.SUSPENDED:
+vendor_verification/services.py:166:        verification.verified_by = reviewer
+vendor_verification/services.py:167:    verification.status = status
+vendor_verification/services.py:168:    verification.save()
+vendor_verification/services.py:169:    if reviewer is not None:
+vendor_verification/services.py:171:            actor=reviewer,
+vendor_verification/services.py:173:            object_type="VendorVerification",
+vendor_verification/services.py:174:            object_id=str(verification.pk),
+vendor_verification/services.py:177:    return verification
+vendor_verification/trust.py:3:from .models import VendorComplaint, VendorTrustSettings, VendorVerification
+vendor_verification/trust.py:42:def vendor_has_caution(seller, verification=None):
+vendor_verification/trust.py:43:    verification = verification or VendorVerification.objects.filter(seller=seller).first()
+vendor_verification/trust.py:44:    if verification and verification.caution_override is True:
+vendor_verification/trust.py:46:    if verification and verification.caution_override is False:
+vendor_verification/trust.py:58:def vendor_caution_reasons(seller, verification=None):
+vendor_verification/trust.py:59:    verification = verification or VendorVerification.objects.filter(seller=seller).first()
+vendor_verification/trust.py:60:    if verification and verification.caution_override is False:
+vendor_verification/trust.py:73:    if verification and verification.caution_override is True and verification.caution_note:
+vendor_verification/trust.py:74:        reasons.append(verification.caution_note.strip())
+vendor_verification/trust.py:79:    verification = VendorVerification.objects.filter(seller=seller).first()
+vendor_verification/trust.py:80:    caution = vendor_has_caution(seller, verification)
+vendor_verification/trust.py:81:    reasons = vendor_caution_reasons(seller, verification) if caution else []
+vendor_verification/trust.py:83:    if verification:
+vendor_verification/trust.py:84:        if verification.status == VendorVerification.TRUSTED:
+vendor_verification/trust.py:85:            badge = {"key": "trusted", "label": "Trusted Vendor", "description": "Trusted by ShopU based on seller reliability and admin review."}
+vendor_verification/trust.py:86:        elif verification.status == VendorVerification.VERIFIED:
+vendor_verification/trust.py:87:            badge = {"key": "verified", "label": "Verified Vendor", "description": "Seller completed ShopU's verification process."}
+vendor_verification/trust.py:88:        elif verification.status in (VendorVerification.SUSPENDED, VendorVerification.REVOKED):
+vendor_verification/trust.py:89:            badge = {"key": "caution", "label": "Proceed with caution", "description": "Seller verification is not currently in good standing."}
+vendor_verification/admin.py:5:    VendorVerification,
+vendor_verification/admin.py:8:    VerificationProgramSettings,
+vendor_verification/admin.py:9:    VerificationStep,
+vendor_verification/admin.py:10:    VerificationStepResult,
+vendor_verification/admin.py:15:@admin.register(VerificationProgramSettings)
+vendor_verification/admin.py:16:class VerificationProgramSettingsAdmin(ShopUModelAdmin):
+vendor_verification/admin.py:18:    fieldsets = (("Program", {"fields": ("enabled", "minimum_completed_transactions")}), ("Legacy built-in toggles", {"fields": ("require_identity", "require_business", "require_payment_history", "require_transaction_history"), "description": "These four toggles remain for compatibility. Use Verification Steps below to add or change the process."}),)
+vendor_verification/admin.py:30:@admin.register(VerificationStep)
+vendor_verification/admin.py:31:class VerificationStepAdmin(ShopUModelAdmin):
+vendor_verification/admin.py:39:@admin.register(VerificationStepResult)
+vendor_verification/admin.py:40:class VerificationStepResultAdmin(ShopUModelAdmin):
+vendor_verification/admin.py:41:    list_display = ("verification", "step", "status", "reviewed_by", "reviewed_at")
+vendor_verification/admin.py:43:    search_fields = ("verification__seller__username", "step__name", "evidence")
+vendor_verification/admin.py:46:@admin.register(VendorVerification)
+vendor_verification/admin.py:47:class VendorVerificationAdmin(ShopUModelAdmin):
+vendor_verification/admin.py:48:    list_display = ("seller", "status", "caution_display", "completed_transactions", "dispute_count", "open_complaints", "verified_by", "trusted_by", "verified_at", "trusted_at")
+vendor_verification/admin.py:49:    search_fields = ("seller__username", "seller__email", "trusted_reason", "caution_note")
+vendor_verification/admin.py:51:    actions = ["promote_trusted", "mark_verified", "demote_to_verified", "suspend_selected", "revoke_selected", "force_caution", "clear_caution_override"]
+vendor_verification/admin.py:53:        ("Vendor status", {"fields": ("seller", "status", "notes", "trusted_reason", "trusted_by", "trusted_at", "verified_by", "verified_at", "revoked_at")}),
+vendor_verification/admin.py:54:        ("Verification evidence", {"fields": ("identity_verified", "business_verified", "payment_history_verified", "transaction_history_verified")}),
+vendor_verification/admin.py:78:        if not request.user.is_superuser and not _allowed(request, VendorVerification, "verify"):
+vendor_verification/admin.py:79:            raise PermissionError("You do not have permission to review vendor verification.")
+vendor_verification/admin.py:87:            obj.seller, obj.status, reviewer=request.user, note=obj.trusted_reason or obj.notes, **values
+vendor_verification/admin.py:92:        updated.trusted_reason = obj.trusted_reason
+vendor_verification/admin.py:93:        updated.save(update_fields=["caution_override", "caution_note", "trusted_reason", "updated_at"])
+vendor_verification/admin.py:96:    @admin.action(description="Promote selected to Trusted Vendor")
+vendor_verification/admin.py:97:    def promote_trusted(self, request, queryset):
+vendor_verification/admin.py:99:            set_vendor_status(obj.seller, VendorVerification.TRUSTED, reviewer=request.user, note=obj.trusted_reason or "Promoted by ShopU admin.")
+vendor_verification/admin.py:104:            set_vendor_status(obj.seller, VendorVerification.VERIFIED, reviewer=request.user, note=obj.notes)
+vendor_verification/admin.py:109:            set_vendor_status(obj.seller, VendorVerification.VERIFIED, reviewer=request.user, note=obj.notes)
+vendor_verification/admin.py:114:            set_vendor_status(obj.seller, VendorVerification.SUSPENDED, reviewer=request.user, note=obj.notes)
+vendor_verification/admin.py:116:    @admin.action(description="Revoke selected verification")
+vendor_verification/admin.py:119:            set_vendor_status(obj.seller, VendorVerification.REVOKED, reviewer=request.user, note=obj.notes)
+vendor_verification/admin.py:132:    list_display = ("id", "seller", "category", "severity", "status", "order", "reviewed_by", "created_at", "resolved_at")
+vendor_verification/admin.py:140:        queryset.update(status=VendorComplaint.SUBSTANTIATED, reviewed_by=request.user, updated_at=timezone.now())
+vendor_verification/admin.py:144:        queryset.update(status=VendorComplaint.DISMISSED, reviewed_by=request.user, updated_at=timezone.now())
+vendor_verification/admin.py:148:        queryset.update(status=VendorComplaint.RESOLVED, reviewed_by=request.user, resolved_at=timezone.now(), updated_at=timezone.now())
+vendor_verification/urls.py:6:    path("settings/", api.verification_settings, name="verification-settings"),
+vendor_verification/urls.py:7:    path("apply/", api.apply, name="vendor-verification-apply"),
+vendor_verification/migrations/0005_rename_vendor_ver_seller__b1a0d7_idx_vendor_veri_seller__3839e5_idx_and_more.py:9:        ('vendor_verification', '0004_trust_signals'),
+vendor_verification/migrations/0002_verificationprogramsettings.py:6:        ("vendor_verification", "0001_initial"),
+vendor_verification/migrations/0002_verificationprogramsettings.py:11:            name="VerificationProgramSettings",
+vendor_verification/migrations/0004_trust_signals.py:8:        ("vendor_verification", "0003_dynamic_verification_steps"),
+vendor_verification/migrations/0004_trust_signals.py:16:            model_name="vendorverification",
+vendor_verification/migrations/0004_trust_signals.py:17:            name="trusted_by",
+vendor_verification/migrations/0004_trust_signals.py:26:        migrations.AddField(model_name="vendorverification", name="trusted_at", field=models.DateTimeField(blank=True, null=True)),
+vendor_verification/migrations/0004_trust_signals.py:27:        migrations.AddField(model_name="vendorverification", name="trusted_reason", field=models.TextField(blank=True)),
+vendor_verification/migrations/0004_trust_signals.py:28:        migrations.AddField(model_name="vendorverification", name="caution_override", field=models.BooleanField(blank=True, default=None, null=True)),
+vendor_verification/migrations/0004_trust_signals.py:29:        migrations.AddField(model_name="vendorverification", name="caution_note", field=models.TextField(blank=True)),
+vendor_verification/migrations/0004_trust_signals.py:44:                ("reviewed_by", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name="vendor_complaints_reviewed", to=settings.AUTH_USER_MODEL)),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:6:    Step = apps.get_model("vendor_verification", "VerificationStep")
+vendor_verification/migrations/0003_dynamic_verification_steps.py:8:        ("identity", "Identity verification", "Confirm the vendor's identity.", True, 10, "document"),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:9:        ("business", "Business verification", "Confirm business details where applicable.", False, 20, "document"),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:10:        ("payment_history", "Payment history", "Review payment history for trust and fraud signals.", False, 30, "manual"),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:11:        ("transaction_history", "Transaction history", "Review completed marketplace transaction history.", True, 40, "boolean"),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:17:    dependencies = [("vendor_verification", "0002_verificationprogramsettings")]
+vendor_verification/migrations/0003_dynamic_verification_steps.py:20:            name="VerificationStep",
+vendor_verification/migrations/0003_dynamic_verification_steps.py:29:                ("evidence_type", models.CharField(choices=[("manual", "Manual review"), ("boolean", "Boolean check"), ("document", "Document evidence"), ("text", "Text evidence")], default="manual", max_length=30)),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:36:            name="VerificationStepResult",
+vendor_verification/migrations/0003_dynamic_verification_steps.py:39:                ("status", models.CharField(choices=[("pending", "Pending"), ("passed", "Passed"), ("failed", "Failed")], default="pending", max_length=20)),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:41:                ("reviewed_at", models.DateTimeField(blank=True, null=True)),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:42:                ("reviewer_note", models.TextField(blank=True)),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:43:                ("reviewed_by", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name="verification_step_reviews", to="auth.user")),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:44:                ("step", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="results", to="vendor_verification.verificationstep")),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:45:                ("verification", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="step_results", to="vendor_verification.vendorverification")),
+vendor_verification/migrations/0003_dynamic_verification_steps.py:50:            model_name="verificationstepresult",
+vendor_verification/migrations/0003_dynamic_verification_steps.py:51:            constraint=models.UniqueConstraint(fields=("verification", "step"), name="unique_vendor_verification_step"),
+vendor_verification/migrations/0001_initial.py:18:            name='VendorVerification',
+vendor_verification/migrations/0001_initial.py:21:                ('status', models.CharField(choices=[('pending', 'Pending'), ('verified', 'Verified'), ('trusted', 'Trusted Vendor'), ('suspended', 'Suspended'), ('revoked', 'Revoked')], default='pending', max_length=20)),
+vendor_verification/migrations/0001_initial.py:28:                ('revoked_at', models.DateTimeField(blank=True, null=True)),
+vendor_verification/migrations/0001_initial.py:31:                ('seller', models.OneToOneField(on_delete=django.db.models.deletion.PROTECT, related_name='vendor_verification', to=settings.AUTH_USER_MODEL)),
+vendor_verification/migrations/0001_initial.py:32:                ('verified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='vendor_verifications_performed', to=settings.AUTH_USER_MODEL)),
+vendor_verification/apps.py:4:class VendorVerificationConfig(AppConfig):
+vendor_verification/apps.py:6:    name = "vendor_verification"
+
+===== MARKETPLACE / ORDERS / LISTINGS =====
+marketplace/admin.py
+marketplace/migrations/0001_initial.py
+marketplace/migrations/0005_alter_product_condition_alter_product_description.py
+marketplace/migrations/0004_listing_evidence.py
+marketplace/migrations/0006_order_idempotency.py
+marketplace/migrations/0003_shopu_marketplace.py
+marketplace/migrations/__init__.py
+marketplace/migrations/0007_multi_currency_precision.py
+marketplace/migrations/0002_product_image.py
+marketplace/services.py
+marketplace/api.py
+marketplace/apps.py
+marketplace/models.py
+marketplace/management/commands/__init__.py
+marketplace/management/__init__.py
+marketplace/views.py
+marketplace/__init__.py
+marketplace/tests.py
+marketplace/admin.py:27:    list_display = ("id", "buyer", "product", "amount", "currency", "listing_version", "status", "buyer_disclosure_acknowledged_at", "confirmation_deadline")
+marketplace/migrations/0001_initial.py:36:                ('status', models.CharField(choices=[('pending', 'Pending'), ('paid', 'Paid'), ('escrow', 'Escrow'), ('completed', 'Completed'), ('refunded', 'Refunded'), ('disputed', 'Disputed')], default='pending', max_length=20)),
+marketplace/migrations/0003_shopu_marketplace.py:8:        migrations.AddField(model_name='order',name='delivered_at',field=models.DateTimeField(blank=True,null=True)),
+marketplace/migrations/0003_shopu_marketplace.py:9:        migrations.AddField(model_name='order',name='confirmation_deadline',field=models.DateTimeField(blank=True,null=True)),
+marketplace/migrations/0003_shopu_marketplace.py:11:        migrations.AlterField(model_name='order',name='status',field=models.CharField(choices=[('pending','Pending'),('paid','Paid'),('escrow','Escrow'),('delivered','Delivered'),('completed','Completed'),('refunded','Refunded'),('disputed','Disputed')],default='pending',max_length=20)),
+marketplace/services.py:225:        status=Order.PENDING,
+marketplace/services.py:259:def mark_order_delivered(*, order_id, seller, auto_release_hours):
+marketplace/services.py:273:    order.status = Order.DELIVERED
+marketplace/services.py:274:    order.delivered_at = timezone.now()
+marketplace/services.py:275:    order.set_deadline(auto_release_hours)
+marketplace/services.py:277:        update_fields=["status", "delivered_at", "confirmation_deadline"]
+marketplace/services.py:284:        run_after=order.confirmation_deadline,
+marketplace/services.py:298:        .filter(pk=order_id, buyer=buyer, status=Order.DELIVERED)
+marketplace/services.py:302:        raise ValueError("Order must be delivered before you can confirm it.")
+marketplace/services.py:305:        order.confirmation_deadline
+marketplace/services.py:306:        and timezone.now() > order.confirmation_deadline
+marketplace/services.py:308:        raise ValueError("The confirmation window has expired.")
+marketplace/services.py:327:            status__in=[Order.ESCROW, Order.DELIVERED],
+marketplace/services.py:341:                status__in=[Order.ESCROW, Order.DELIVERED],
+marketplace/services.py:350:        order=order, status=Escrow.HOLDING
+marketplace/models.py:83:    PENDING='pending'; PAID='paid'; ESCROW='escrow'; DELIVERED='delivered'; COMPLETED='completed'; REFUNDED='refunded'; DISPUTED='disputed'
+marketplace/models.py:84:    STATUS_CHOICES=[(PENDING,'Pending'),(PAID,'Paid'),(ESCROW,'Escrow'),(DELIVERED,'Delivered'),(COMPLETED,'Completed'),(REFUNDED,'Refunded'),(DISPUTED,'Disputed')]
+marketplace/models.py:99:    status=models.CharField(max_length=20,choices=STATUS_CHOICES,default=PENDING)
+marketplace/models.py:102:    delivered_at=models.DateTimeField(null=True,blank=True)
+marketplace/models.py:103:    confirmation_deadline=models.DateTimeField(null=True,blank=True)
+marketplace/models.py:106:    def set_deadline(self,hours=6):
+marketplace/models.py:107:        self.confirmation_deadline=timezone.now()+timedelta(hours=hours)
+marketplace/tests.py:120:            purchase_product, mark_order_delivered, confirm_order
+marketplace/tests.py:126:        mark_order_delivered(
+
+===== SUPPORT =====
+support/tests.py:51:        self.assertEqual(ticket.status, Ticket.ASSIGNED)
+support/tests.py:61:        self.assertEqual(Ticket.objects.filter(assigned_agent=self.agent, status=Ticket.ASSIGNED).count(), 1)
+support/tests.py:62:        self.assertEqual(Ticket.objects.filter(status=Ticket.WAITING_AGENT).count(), 1)
+support/tests.py:70:        self.assertIsNone(ticket.response_deadline)
+support/migrations/0001_initial.py:32:                ('expiry_message', models.TextField(default="We didn't hear back from you in time, so this support session has expired and you've been removed from the queue. Feel free to reach out again whenever you're ready.")),
+support/migrations/0001_initial.py:33:                ('queue_notice_message', models.TextField(default="You've been added to the live agent queue. Heads up: once an agent is matched to you, you'll need to respond within the response window or you'll be removed from the queue and will need to request an agent again.")),
+support/migrations/0001_initial.py:41:                ('trigger_keywords', models.CharField(help_text="Comma-separated keywords/phrases. Case-insensitive substring match against the user's message. e.g. 'refund, money back, didn't receive'", max_length=500)),
+support/migrations/0001_initial.py:43:                ('priority', models.IntegerField(default=0, help_text='Higher priority entries are checked first when multiple match.')),
+support/migrations/0001_initial.py:69:                ('status', models.CharField(choices=[('open', 'Open — bot handling'), ('waiting_agent', 'Waiting for a live agent'), ('assigned', 'Assigned to an agent'), ('resolved', 'Resolved'), ('closed', 'Closed'), ('expired', 'Expired — no response')], default='open', max_length=20)),
+support/migrations/0001_initial.py:73:                ('response_deadline', models.DateTimeField(blank=True, help_text='Requester must send a message by this time or the ticket auto-expires.', null=True)),
+support/migrations/0001_initial.py:78:                ('assigned_agent', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='tickets', to='support.supportagent')),
+support/migrations/0001_initial.py:85:            index=models.Index(fields=['status', 'response_deadline'], name='support_tic_status_2f6d59_idx'),
+support/migrations/0003_rename_support_tic_status_2f6d59_idx_support_tic_status_5d7ec7_idx_and_more.py:26:            field=models.PositiveIntegerField(default=15, help_text='Once an agent claims a ticket, the requester has this long to say something. If they go quiet, the ticket expires and the agent is freed up for the next person.'),
+support/migrations/0003_rename_support_tic_status_2f6d59_idx_support_tic_status_5d7ec7_idx_and_more.py:31:            field=models.PositiveIntegerField(default=7, help_text="An agent can't be assigned a new ticket while they already have this many open. Adjustable per-agent below as well."),
+support/urls.py:11:    path('agent/queue/', views.agent_queue, name='support-agent-queue'),
+support/views.py:28:        'assigned_agent': ticket.assigned_agent.user.username if ticket.assigned_agent else None,
+support/views.py:30:        'response_deadline': ticket.response_deadline.isoformat() if ticket.response_deadline else None,
+support/views.py:40:    qs = Ticket.objects.filter(requester=user).select_related('field', 'assigned_agent__user', 'related_order').prefetch_related('messages')
+support/views.py:67:    ticket = Ticket.objects.filter(pk=ticket_id, requester=user).select_related('field','assigned_agent__user','related_order').prefetch_related('messages').first()
+support/views.py:79:        ticket = Ticket.objects.filter(pk=ticket.id).select_related('field','assigned_agent__user').prefetch_related('messages').get()
+support/views.py:95:        ticket = Ticket.objects.filter(pk=ticket.id).select_related('field','assigned_agent__user').prefetch_related('messages').get()
+support/views.py:108:        ticket = Ticket.objects.filter(pk=ticket.id).select_related('field','assigned_agent__user').prefetch_related('messages').get()
+support/views.py:120:def agent_queue(request):
+support/views.py:124:    tickets = Ticket.objects.filter(status=Ticket.WAITING_AGENT).select_related('requester','field','related_order').order_by('live_agent_requested_at')[:100]
+support/views.py:125:    mine = Ticket.objects.filter(status=Ticket.ASSIGNED, assigned_agent=agent).select_related('requester','field','related_order').order_by('-updated_at')[:100]
+support/views.py:128:    return JsonResponse({'waiting':[row(t) for t in tickets], 'assigned':[row(t) for t in mine]})
+support/views.py:145:        ticket = Ticket.objects.filter(pk=ticket.id).select_related('field','assigned_agent__user').prefetch_related('messages').get()
+support/services.py:6:  - An agent at their open-ticket limit cannot be assigned another
+support/services.py:7:    until one of their current tickets is resolved/closed/expired.
+support/services.py:10:  - Once a live agent is matched, the requester has a configurable
+support/services.py:11:    window to respond or the ticket auto-expires and the agent is
+support/services.py:12:    freed for the next person in the queue.
+support/services.py:14:    closed — whether it was resolved or expired.
+support/services.py:58:def match_knowledge(message_text):
+support/services.py:60:    Naive but effective keyword matching against admin-curated
+support/services.py:61:    entries. Highest-priority match wins; first match by priority
+support/services.py:84:    entry = match_knowledge(message)
+support/services.py:103:    if ticket.status in (Ticket.CLOSED, Ticket.EXPIRED, Ticket.RESOLVED):
+support/services.py:109:    # Answering keeps a claimed ticket alive — push the deadline out
+support/services.py:111:    if ticket.status == Ticket.ASSIGNED and ticket.response_deadline:
+support/services.py:113:        ticket.response_deadline = timezone.now() + timezone.timedelta(minutes=minutes)
+support/services.py:114:        ticket.save(update_fields=["response_deadline", "updated_at"])
+support/services.py:118:        entry = match_knowledge(content)
+support/services.py:132:        .get(pk=ticket_id, assigned_agent=agent)
+support/services.py:134:    if ticket.status != Ticket.ASSIGNED:
+support/services.py:135:        raise ValueError(f"Ticket isn't currently assigned (status: {ticket.status})")
+support/services.py:138:    ticket.response_deadline = timezone.now() + timezone.timedelta(minutes=minutes)
+support/services.py:139:    ticket.save(update_fields=['response_deadline', 'updated_at'])
+support/services.py:156:    if ticket.status in (Ticket.CLOSED, Ticket.EXPIRED, Ticket.RESOLVED):
+support/services.py:161:    ticket.status = Ticket.WAITING_AGENT
+support/services.py:166:    _add_message(ticket, TicketMessage.SYSTEM, get_settings().queue_notice_message)
+support/services.py:169:    try_match_queue()
+support/services.py:176:    return Ticket.objects.filter(assigned_agent=agent, status=Ticket.ASSIGNED).count()
+support/services.py:181:    Least-loaded available agent under their capacity, matching the
+support/services.py:185:    waiting indefinitely.
+support/services.py:206:def claim_ticket_for_queue(ticket, agent):
+support/services.py:211:    current_load = Ticket.objects.filter(assigned_agent=agent, status=Ticket.ASSIGNED).count()
+support/services.py:218:    ticket.assigned_agent = agent
+support/services.py:220:    ticket.status = Ticket.ASSIGNED
+support/services.py:222:    ticket.response_deadline = now + timezone.timedelta(minutes=minutes)
+support/services.py:223:    ticket.save(update_fields=["assigned_agent", "requested_live_agent", "status", "claimed_at", "response_deadline", "updated_at"])
+support/services.py:228:        f"you'll be removed from the queue and will need to request an agent again.",
+support/services.py:232:        agent.user, "support.ticket_assigned", "New support ticket assigned",
+support/services.py:233:        f"Ticket #{ticket.pk} has been assigned to you.",
+support/services.py:243:def try_match_queue():
+support/services.py:245:    Walk the waiting queue oldest-first and match anyone we can to
+support/services.py:247:    might free up capacity (claim, resolve, close, expire) or on a
+support/services.py:251:    waiting = Ticket.objects.filter(status=Ticket.WAITING_AGENT).order_by("live_agent_requested_at")
+support/services.py:253:    matched = []
+support/services.py:254:    for ticket in waiting:
+support/services.py:259:                if locked.status != Ticket.WAITING_AGENT:
+support/services.py:262:                    claim_ticket_for_queue(locked, agent)
+support/services.py:265:                    # candidate scan. Leave the ticket queued and continue.
+support/services.py:267:                matched.append(ticket.pk)
+support/services.py:269:    return matched
+support/services.py:274:    """An agent explicitly picks up a waiting ticket from their dashboard."""
+support/services.py:279:    if ticket.status != Ticket.WAITING_AGENT:
+support/services.py:280:        raise ValueError(f"Ticket is not waiting for an agent (status: {ticket.status})")
+support/services.py:288:    claim_ticket_for_queue(ticket, agent)
+support/services.py:301:    current agent's capacity immediately and re-enters the queue
+support/services.py:302:    for automatic matching to an available expert in that field.
+support/services.py:306:    ticket = Ticket.objects.select_for_update().get(pk=ticket_id, assigned_agent=agent)
+support/services.py:308:    ticket.assigned_agent = None
+support/services.py:309:    ticket.status = Ticket.WAITING_AGENT
+support/services.py:312:    ticket.response_deadline = None
+support/services.py:313:    ticket.save(update_fields=["assigned_agent", "status", "field", "claimed_at", "response_deadline", "updated_at"])
+support/services.py:320:    try_match_queue()
+support/services.py:333:    ticket = Ticket.objects.select_for_update().get(pk=ticket_id, assigned_agent=agent)
+support/services.py:335:    if ticket.status != Ticket.ASSIGNED:
+support/services.py:336:        raise ValueError(f"Ticket isn't currently assigned (status: {ticket.status})")
+support/services.py:345:    ticket.response_deadline = None
+support/services.py:346:    ticket.save(update_fields=["status", "resolved_at", "closed_at", "response_deadline", "updated_at"])
+support/services.py:352:    try_match_queue()
+support/services.py:360:    if ticket.status in (Ticket.CLOSED, Ticket.EXPIRED):
+support/services.py:367:    ticket.response_deadline = None
+support/services.py:369:    ticket.save(update_fields=['status','closed_at','response_deadline','requested_live_agent','updated_at'])
+support/services.py:372:    try_match_queue()
+support/services.py:380:def expire_unattended_tickets():
+support/services.py:382:    Any ASSIGNED ticket whose response_deadline has passed with no
+support/services.py:384:    freed, requester informed they've been dropped from the queue.
+support/services.py:388:    due = Ticket.objects.filter(status=Ticket.ASSIGNED, response_deadline__lte=now)
+support/services.py:390:    expired = []
+support/services.py:394:            if locked.status != Ticket.ASSIGNED or not locked.response_deadline or locked.response_deadline > now:
+support/services.py:400:            locked.status = Ticket.EXPIRED
+support/services.py:403:            locked.response_deadline = None
+support/services.py:404:            locked.save(update_fields=["status", "requested_live_agent", "closed_at", "response_deadline", "updated_at"])
+support/services.py:406:            notify(locked.requester, "support.ticket_expired", "Support session expired", message)
+support/services.py:408:            _log(None, "support.expired", locked)
+support/services.py:409:            expired.append(locked.pk)
+support/services.py:411:    if expired:
+support/services.py:412:        try_match_queue()
+support/services.py:414:    return expired
+support/services.py:419:    expired = expire_unattended_tickets()
+support/services.py:420:    matched = try_match_queue()
+support/services.py:421:    return {"expired": expired, "matched": matched}
+support/admin.py:53:        return obj.tickets.filter(status=Ticket.ASSIGNED).count()
+support/admin.py:92:        "assigned_agent",
+support/admin.py:94:        "response_deadline",
+support/admin.py:112:    @admin.action(description="Claim selected waiting tickets (as me)")
+support/admin.py:144:    @admin.action(description="Resolve selected tickets (assigned to me)")
+support/models.py:9:    time and it takes effect on the next ticket/queue check.
+support/models.py:16:        help_text="An agent can't be assigned a new ticket while they already "
+support/models.py:23:                   "to say something. If they go quiet, the ticket expires and "
+support/models.py:34:                "session has expired and you've been removed from the queue. "
+support/models.py:38:    queue_notice_message = models.TextField(
+support/models.py:39:        default="You've been added to the live agent queue. Heads up: once "
+support/models.py:40:                "an agent is matched to you, you'll need to respond within "
+support/models.py:41:                "the response window or you'll be removed from the queue "
+support/models.py:69:    A staff member who can be assigned support tickets. Being a
+support/models.py:112:        help_text="Comma-separated keywords/phrases. Case-insensitive substring match "
+support/models.py:117:        default=0, help_text="Higher priority entries are checked first when multiple match.",
+support/models.py:137:    OPEN = "open"                    # bot handling / unassigned
+support/models.py:138:    WAITING_AGENT = "waiting_agent"  # requester asked for a human, queued
+support/models.py:139:    ASSIGNED = "assigned"            # a live agent has claimed it
+support/models.py:142:    EXPIRED = "expired"              # requester went quiet, auto-closed
+support/models.py:146:        (WAITING_AGENT, "Waiting for a live agent"),
+support/models.py:147:        (ASSIGNED, "Assigned to an agent"),
+support/models.py:150:        (EXPIRED, "Expired — no response"),
+support/models.py:167:    assigned_agent = models.ForeignKey(
+support/models.py:175:    response_deadline = models.DateTimeField(
+support/models.py:177:        help_text="Requester must send a message by this time or the ticket auto-expires.",
+support/models.py:188:            models.Index(fields=("status", "response_deadline")),
+
+===== EXISTING JOB DISPATCH =====
+"""Small, database-backed event-driven job queue.
+
+Jobs are created by business events.  The external runner is only a trigger;
+the database is the source of truth, so retries are safe and no work is lost
+when Render restarts or sleeps.
+"""
+import logging
+from datetime import timedelta
+
+import requests
+from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
+
+from .models import BackgroundJob
+
+logger = logging.getLogger(__name__)
+
+
+def enqueue_job(kind, *, dedupe_key, payload=None, run_after=None, max_attempts=5):
+    """Create/revive one job and notify the external runner after commit."""
+    run_after = run_after or timezone.now()
+    with transaction.atomic():
+        job, created = BackgroundJob.objects.select_for_update().get_or_create(
+            dedupe_key=dedupe_key,
+            defaults={
+                "kind": kind,
+                "payload": payload or {},
+                "run_after": run_after,
+                "max_attempts": max_attempts,
+            },
+        )
+        if not created and job.status == BackgroundJob.FAILED and job.attempts < job.max_attempts:
+            job.status = BackgroundJob.PENDING
+            job.run_after = run_after
+            job.last_error = ""
+            job.save(update_fields=["status", "run_after", "last_error", "updated_at"])
+        transaction.on_commit(trigger_runner)
+        return job, created
+
+
+def trigger_runner():
+    """Ask GitHub Actions to run immediately when configured.
+
+    Failure to notify the runner never rolls back the business transaction;
+    the low-frequency safety scheduler can pick up the pending job later.
+    """
+    token = getattr(settings, "SHOPU_GITHUB_ACTIONS_TOKEN", "")
+    repository = getattr(settings, "SHOPU_GITHUB_REPOSITORY", "")
+    event_type = getattr(settings, "SHOPU_GITHUB_EVENT_TYPE", "shopu-job")
+    if not token or not repository:
+        return False
+    url = f"https://api.github.com/repos/{repository}/dispatches"
+    try:
+        response = requests.post(
+            url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            json={"event_type": event_type},
+            timeout=5,
+        )
+        response.raise_for_status()
+        return True
+    except requests.RequestException as exc:
+        logger.warning("Unable to trigger GitHub maintenance runner: %s", exc)
+        return False
+
+
+def claim_job():
+    """Atomically claim one due job; safe with the maintenance lease."""
+    now = timezone.now()
+    with transaction.atomic():
+        # Recover jobs abandoned by a crashed worker.
+        # A RUNNING job whose lease has expired is safe to retry.
+        BackgroundJob.objects.filter(
+            status=BackgroundJob.RUNNING,
+            locked_until__isnull=False,
+            locked_until__lte=now,
+        ).update(
+            status=BackgroundJob.PENDING,
+            locked_until=None,
+        )
+
+        job = (
+            BackgroundJob.objects.select_for_update()
+            .filter(status=BackgroundJob.PENDING, run_after__lte=now)
+            .filter(locked_until__isnull=True)
+            .order_by("run_after", "id")
+            .first()
+        )
+        if not job:
+            return None
+        job.status = BackgroundJob.RUNNING
+        job.attempts += 1
+        job.locked_until = now + timedelta(minutes=10)
+        job.started_at = now
+        job.save(update_fields=["status", "attempts", "locked_until", "started_at", "updated_at"])
+        return job
+
+
+def complete_job(job, *, result=None):
+    job.status = BackgroundJob.COMPLETED
+    job.completed_at = timezone.now()
+    job.locked_until = None
+    job.result = result or {}
+    job.last_error = ""
+    job.save(update_fields=["status", "completed_at", "locked_until", "result", "last_error", "updated_at"])
+
+
+def fail_job(job, exc):
+    now = timezone.now()
+    job.locked_until = None
+    job.last_error = str(exc)[:5000]
+    if job.attempts >= job.max_attempts:
+        job.status = BackgroundJob.FAILED
+    else:
+        job.status = BackgroundJob.PENDING
+        # Exponential retry backoff, capped at 30 minutes.
+        delay = min(30, 2 ** max(0, job.attempts - 1))
+        job.run_after = now + timedelta(minutes=delay)
+    job.save(update_fields=["status", "locked_until", "last_error", "run_after", "updated_at"])
+
+
+def process_pending_jobs(limit=25):
+    """Process only jobs that actually exist and are due."""
+    from escrow.automation import process_job
+
+    processed = 0
+    errors = []
+    for _ in range(limit):
+        job = claim_job()
+        if not job:
+            break
+        try:
+            result = process_job(job)
+            complete_job(job, result=result or {})
+            processed += 1
+        except Exception as exc:
+            fail_job(job, exc)
+            errors.append(f"job {job.id}: {exc}")
+    return processed, errors
+
+from django.utils import timezone
+
+from escrow.models import Escrow, PrivateEscrow
+from escrow.services import _release_escrow_internal, _release_private_escrow_internal
+from marketplace.models import Order
+from telegram_integration.models import Notification
+
+
+def _release_order(order_id):
+    order = Order.objects.select_related("product", "product__seller", "buyer").get(pk=order_id)
+    if order.status != Order.DELIVERED:
+        return False
+    if not order.confirmation_deadline or order.confirmation_deadline > timezone.now():
+        return False
+    escrow = Escrow.objects.filter(order=order, status=Escrow.HOLDING).first()
+    if not escrow:
+        return False
+    _release_escrow_internal(escrow, reason="inspection_window_expired")
+    Notification.objects.create(
+        user=order.buyer,
+        kind="escrow",
+        title="Order auto-settled",
+        message=f"Order #{order.id} passed the inspection window and was automatically settled.",
+    )
+    Notification.objects.create(
+        user=order.product.seller,
+        kind="escrow",
+        title="Funds released",
+        message=f"Order #{order.id} passed the inspection window and funds were released.",
+    )
+    return True
+
+
+def _release_private(escrow_id):
+    escrow = PrivateEscrow.objects.select_related("seller", "buyer").get(escrow_id=escrow_id)
+    if escrow.status != PrivateEscrow.DELIVERED:
+        return False
+    if not escrow.deadline or escrow.deadline > timezone.now():
+        return False
+    _release_private_escrow_internal(escrow, reason="inspection_window_expired")
+    Notification.objects.create(
+        user=escrow.seller,
+        kind="escrow",
+        title="Private escrow auto-settled",
+        message=f"{escrow.escrow_id} passed its inspection window and was released.",
+    )
+    return True
+
+
+def process_job(job):
+    """Dispatch one database job. Add new job kinds here as background features grow."""
+    kind = job.kind
+    payload = job.payload or {}
+    if kind == "escrow.auto_release":
+        if payload.get("private_escrow_id"):
+            done = _release_private(payload["private_escrow_id"])
+        else:
+            done = _release_order(payload.get("order_id"))
+        return {"released": bool(done), "job": kind}
+    raise ValueError(f"Unknown background job kind: {kind}")
+
+
+def run_auto_release():
+    """Compatibility command: enqueue due/missing escrow jobs, then process jobs.
+
+    New deployments should rely on event-created jobs. This compatibility path is
+    intentionally bounded and only exists so old delivered records are not stranded.
+    """
+    from adminpanel.jobs import enqueue_job, process_pending_jobs
+
+    now = timezone.now()
+    for order in Order.objects.filter(status=Order.DELIVERED, confirmation_deadline__isnull=False, confirmation_deadline__lte=now):
+        enqueue_job(
+            "escrow.auto_release",
+            dedupe_key=f"escrow:auto-release:order:{order.pk}",
+            payload={"order_id": order.pk},
+            run_after=order.confirmation_deadline,
+        )
+    for escrow in PrivateEscrow.objects.filter(status=PrivateEscrow.DELIVERED, deadline__isnull=False, deadline__lte=now):
+        enqueue_job(
+            "escrow.auto_release",
+            dedupe_key=f"escrow:auto-release:private:{escrow.escrow_id}",
+            payload={"private_escrow_id": escrow.escrow_id},
+            run_after=escrow.deadline,
+        )
+    return None
+
+import hmac
+from datetime import timedelta
+
+from django.conf import settings
+from django.db import transaction
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from adminpanel.models import MaintenanceLease
+from adminpanel.jobs import process_pending_jobs
+
+
+def _acquire_lease():
+    now = timezone.now()
+
+    with transaction.atomic():
+        lease, _ = MaintenanceLease.objects.select_for_update().get_or_create(pk=1)
+
+        if lease.locked_until and lease.locked_until > now:
+            return None
+
+        lease.locked_until = now + timedelta(seconds=110)
+        lease.last_started_at = now
+        lease.save(
+            update_fields=[
+                "locked_until",
+                "last_started_at",
+                "updated_at",
+            ]
+        )
+        return lease
+
+
+def _run_maintenance():
+    """
+    Central ShopU maintenance cycle.
+
+    All periodic/background maintenance is executed from this single
+    entry point. External schedulers only wake this endpoint.
+    """
+    errors = []
+    result = {}
+
+    # 1. Discover/enqueue overdue escrow jobs.
+    try:
+        from escrow.automation import run_auto_release
+
+        run_auto_release()
+        result["escrow_discovery"] = True
+    except Exception as exc:
+        result["escrow_discovery"] = False
+        errors.append(f"escrow discovery: {exc}")
+
+    # 2. Process database-backed background jobs.
+    try:
+        processed, job_errors = process_pending_jobs(limit=25)
+        result["jobs_processed"] = processed
+        errors.extend(job_errors)
+    except Exception as exc:
+        result["jobs_processed"] = 0
+        errors.append(f"background jobs: {exc}")
+
+    # 3. Support queue/expiry maintenance.
+    try:
+        from support.services import run_support_maintenance
+
+        result["support"] = run_support_maintenance()
+    except Exception as exc:
+        result["support"] = {"error": str(exc)}
+        errors.append(f"support maintenance: {exc}")
+
+    return result, errors
+
+
+@require_POST
+def auto_release(request):
+    """
+    Central authenticated ShopU scheduler endpoint.
+
+    cron-job.org and GitHub Actions both call this endpoint.
+    The database lease prevents overlapping executions.
+    """
+    configured = getattr(settings, "SHOPU_CRON_SECRET", "")
+    supplied = request.headers.get("X-ShopU-Cron-Secret", "")
+
+    if not configured or not hmac.compare_digest(supplied, configured):
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    lease = _acquire_lease()
+
+    if lease is None:
+        return JsonResponse(
+            {
+                "success": True,
+                "skipped": "another maintenance worker is already running",
+            },
+            status=200,
+        )
+
+    try:
+        result, errors = _run_maintenance()
+
+        now = timezone.now()
+
+        final_result = {
+            **result,
+            "errors": errors,
+            "finished_at": now.isoformat(),
+        }
+
+        lease.last_result = final_result
+        lease.last_finished_at = now
+        lease.locked_until = None
+        lease.save(
+            update_fields=[
+                "last_result",
+                "last_finished_at",
+                "locked_until",
+                "updated_at",
+            ]
+        )
+
+        return JsonResponse(
+            {
+                "success": not bool(errors),
+                **final_result,
+            },
+            status=200 if not errors else 207,
+        )
+
+============================================================
+ SOURCE REVIEW COMPLETE
+============================================================

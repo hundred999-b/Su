@@ -1,0 +1,44 @@
+name: ShopU Maintenance
+
+on:
+  repository_dispatch:
+    types: [shopu-job]
+
+  schedule:
+    - cron: "*/15 * * * *"
+
+  workflow_dispatch:
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wake and process ShopU jobs
+        env:
+          SHOPU_URL: ${{ secrets.SHOPU_URL }}
+          SHOPU_CRON_SECRET: ${{ secrets.SHOPU_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$SHOPU_URL" ]; then
+            echo "SHOPU_URL secret is missing"
+            exit 1
+          fi
+
+          if [ -z "$SHOPU_CRON_SECRET" ]; then
+            echo "SHOPU_CRON_SECRET secret is missing"
+            exit 1
+          fi
+
+          curl --fail-with-body \
+            --show-error \
+            --silent \
+            --request POST \
+            --connect-timeout 30 \
+            --max-time 180 \
+            --header "X-ShopU-Cron-Secret: ${SHOPU_CRON_SECRET}" \
+            "${SHOPU_URL%/}/api/maintenance/auto-release"
+
+          echo
+          echo "ShopU maintenance request completed."

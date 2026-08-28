@@ -1,0 +1,16 @@
+
+Django>=5.2,<6
+Pillow
+argon2-cffi>=25
+boto3
+cryptography>=44,<47
+dj-database-url
+django-storages
+django-storages[s3]
+djangorestframework>=3.16
+gunicorn
+whitenoise
+psycopg[binary]
+python-telegram-bot>=22,<23
+requests>=2.32,<3
+stripe>=12,<13

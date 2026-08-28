@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>ShopU Marketplace</title>
+<script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+<style>
+:root{
+  --bg:var(--tg-theme-bg-color,#f4f7fb);
+  --surface:var(--tg-theme-secondary-bg-color,#fff);
+  --text:var(--tg-theme-text-color,#111827);
+  --muted:var(--tg-theme-hint-color,#64748b);
+  --link:var(--tg-theme-link-color,#2563eb);
+  --accent:var(--tg-theme-button-color,#111827);
+  --accentText:var(--tg-theme-button-text-color,#fff);
+  --border:rgba(100,116,139,.18);
+  --soft:rgba(100,116,139,.08);
+  --success:#16a34a;
+  --warning:#d97706;
+  --danger:#dc2626;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);min-height:100vh}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+header{
+  position:sticky;top:0;z-index:20;
+  padding:calc(14px + env(safe-area-inset-top)) 16px 14px;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--border)
+}
+.header-inner{max-width:980px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:40px;height:40px;border-radius:13px;background:var(--accent);color:var(--accentText);display:grid;place-items:center;font-weight:900;letter-spacing:-1px}
+.brand-title{font-size:20px;font-weight:900;letter-spacing:-.4px}
+.brand-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.icon-btn{width:42px;height:42px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:13px;position:relative}
+.badge{position:absolute;right:-3px;top:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;border:2px solid var(--bg)}
+main{max-width:980px;margin:auto;padding:16px 14px calc(100px + env(safe-area-inset-bottom))}
+.hero{
+  position:relative;overflow:hidden;padding:22px;border-radius:24px;
+  color:#fff;background:linear-gradient(135deg,#0f172a,#1e293b 60%,#334155);
+  box-shadow:0 14px 40px rgba(15,23,42,.18);margin-bottom:16px
+}
+.hero:after{content:"";position:absolute;width:190px;height:190px;border-radius:50%;right:-65px;top:-85px;background:rgba(255,255,255,.08)}
+.hero h1{margin:0 0 6px;font-size:28px;letter-spacing:-1px}
+.hero p{margin:0;color:rgba(255,255,255,.72);font-size:13px;max-width:600px}
+.hero-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hero-chip{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:8px 11px;font-size:12px;font-weight:700}
+.tabs{display:flex;gap:7px;overflow:auto;padding:3px 1px 12px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{white-space:nowrap;border:1px solid var(--border);border-radius:999px;padding:10px 13px;background:var(--surface);color:var(--text);font-weight:750}
+.tabs button.active{background:var(--accent);color:var(--accentText);border-color:var(--accent)}
+.toolbar{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px}
+.searchbox{position:relative}
+.searchbox input{padding-left:40px}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted)}
+input,.field,select,textarea{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:13px;background:var(--surface);color:var(--text);outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--link);box-shadow:0 0 0 3px color-mix(in srgb,var(--link) 14%,transparent)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:15px;margin:11px 0;box-shadow:0 6px 24px rgba(15,23,42,.045)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:12px}
+.product-card{overflow:hidden;padding:0;transition:transform .15s ease,box-shadow .15s ease}
+.product-card:active{transform:scale(.99)}
+.market-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:4px 0 12px}.market-kicker{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:900;color:var(--link)}.market-title{font-size:25px;letter-spacing:-.8px;margin:2px 0;font-weight:950}.market-sub{font-size:12px;color:var(--muted);margin:0}.product-card{box-shadow:0 12px 32px rgba(15,23,42,.06)}.product-image{height:220px;position:relative}.seller-mini{display:flex;align-items:center;gap:8px}.avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;background:var(--soft);display:grid;place-items:center;font-weight:900}.avatar-lg{width:76px;height:76px;border-radius:24px}.profile-head{display:flex;align-items:center;gap:14px}.file-button{position:relative;overflow:hidden}.file-button input{position:absolute;inset:0;opacity:0;cursor:pointer}.support-message{padding:10px 12px;border-radius:14px;margin:7px 0;max-width:88%;white-space:pre-wrap}.support-message.user{margin-left:auto;background:var(--accent);color:var(--accentText)}.support-message.agent,.support-message.bot{background:var(--soft)}.support-message.system{margin-inline:auto;text-align:center;background:rgba(37,99,235,.08);color:var(--muted);font-size:12px}.support-compose{display:flex;gap:8px;position:sticky;bottom:0;background:var(--surface);padding-top:10px}.market-filter{display:flex;gap:7px;overflow:auto;margin:8px 0 14px}.market-filter .pill{cursor:pointer;white-space:nowrap}.market-filter .pill.active{background:var(--accent);color:var(--accentText)}
+.product-image{height:190px;background:linear-gradient(135deg,#e2e8f0,#f8fafc);display:grid;place-items:center;overflow:hidden}
+.product-image img{width:100%;height:100%;object-fit:cover;display:block}
+.product-image .placeholder{font-size:42px;opacity:.4}
+.product-body{padding:15px}
+.product-title{font-size:17px;font-weight:850;margin:0 0 5px;line-height:1.2}
+.product-desc{font-size:13px;line-height:1.45;color:var(--muted);margin:9px 0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.price{font-size:19px;font-weight:900;letter-spacing:-.3px}
+.muted{color:var(--muted);font-size:12px}
+.status{font-size:11px;font-weight:800}
+.green{color:var(--success)} .yellow{color:var(--warning)} .danger{color:var(--danger)}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:999px;background:var(--soft);font-size:11px;font-weight:750}
+.verified{background:rgba(22,163,74,.1);color:var(--success)}
+.stars{letter-spacing:1px}
+.btn{border:0;border-radius:13px;padding:11px 14px;background:var(--soft);color:var(--text);font-weight:800}
+.btn.primary{background:var(--accent);color:var(--accentText)}
+.btn.ghost{background:transparent;border:1px solid var(--border)}
+.btn.full{width:100%}
+.note{background:rgba(217,119,6,.09);padding:12px 13px;border-radius:13px;color:var(--warning);font-size:12px;line-height:1.45}
+.section-title{font-size:18px;font-weight:900;margin:4px 0 3px}
+label{display:block;font-size:12px;font-weight:800;margin:12px 0 5px}
+.small{font-size:12px}
+.hide{display:none!important}
+.empty{text-align:center;padding:34px 18px;color:var(--muted)}
+.empty-icon{font-size:35px;margin-bottom:8px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:flex-end;justify-content:center}
+.modal-backdrop.show{display:flex}
+.modal{width:min(680px,100%);max-height:92vh;overflow:auto;background:var(--surface);color:var(--text);border-radius:24px 24px 0 0;padding:18px 16px calc(22px + env(safe-area-inset-bottom))}
+.modal-handle{width:42px;height:4px;border-radius:9px;background:var(--muted);opacity:.35;margin:0 auto 14px}
+.modal-image{width:100%;height:min(48vh,360px);border-radius:18px;overflow:hidden;background:var(--soft);display:grid;place-items:center}
+.modal-image img{width:100%;height:100%;object-fit:cover}
+.modal-close{position:absolute;right:14px;top:14px}
+.detail-title{font-size:24px;font-weight:900;letter-spacing:-.7px;margin:14px 0 5px}
+.seller-box{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;background:var(--soft);border-radius:16px;margin:12px 0}
+.seller-name{font-weight:850}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.stat{padding:11px;background:var(--soft);border-radius:14px;text-align:center}
+.stat b{display:block;font-size:15px}
+.stat span{font-size:10px;color:var(--muted)}
+.review{padding:11px 0;border-top:1px solid var(--border)}
+.review:first-child{border-top:0}
+.review-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.review-comment{margin:6px 0 0;line-height:1.5;font-size:13px}
+.review-section{margin-top:16px}
+.review-form textarea{min-height:110px;resize:vertical}
+.star-picker{display:flex;gap:5px;margin:8px 0 4px}
+.star-picker button{border:0;background:transparent;font-size:28px;padding:2px;color:#cbd5e1}
+.star-picker button.selected{color:#f59e0b}
+.bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:15;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(18px);border-top:1px solid var(--border)}
+.bottom-inner{max-width:560px;margin:auto;display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.bottom-nav button{border:0;background:transparent;color:var(--muted);padding:7px 2px;border-radius:12px;font-size:10px;font-weight:800}
+.bottom-nav button.active{background:var(--soft);color:var(--text)}
+.bottom-nav .nav-icon{display:block;font-size:18px;margin-bottom:2px}
+.toast{position:fixed;left:14px;right:14px;bottom:82px;z-index:70;background:#0f172a;color:#fff;border-radius:14px;padding:12px 14px;display:none;box-shadow:0 12px 30px rgba(0,0,0,.25);font-size:13px}
+.toast.show{display:block}
+
+.trust-badge{display:inline-flex;align-items:center;gap:5px;border:1px solid currentColor;border-radius:999px;padding:4px 7px;font-size:10px;font-weight:900;line-height:1;white-space:nowrap;vertical-align:middle}
+.trust-badge svg{width:14px;height:14px;flex:0 0 14px}
+.trust-badge.trusted{color:#a16207;background:rgba(234,179,8,.12);border-color:rgba(161,98,7,.24)}
+.trust-badge.verified{color:#2563eb;background:rgba(37,99,235,.09);border-color:rgba(37,99,235,.2)}
+.trust-badge.caution{color:#b45309;background:rgba(245,158,11,.13);border-color:rgba(180,83,9,.28)}
+.caution-strip{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:10px 11px;border-radius:13px;background:rgba(245,158,11,.11);border:1px solid rgba(245,158,11,.24);color:#92400e;font-size:12px;line-height:1.4}
+.caution-strip svg{width:18px;height:18px;flex:0 0 18px}
+.market-trust-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 14px}
+.market-trust-item{padding:10px 11px;border:1px solid var(--border);border-radius:16px;background:var(--surface);box-shadow:0 5px 18px rgba(15,23,42,.035)}
+.market-trust-item b{display:block;font-size:12px}.market-trust-item span{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+.market-filter{display:flex;gap:7px;overflow:auto;margin:8px 0 14px;padding-bottom:2px}.market-filter .pill{cursor:pointer;white-space:nowrap}.market-filter .pill.active{background:var(--accent);color:var(--accentText)}
+.product-card{position:relative}.product-image{height:230px;background:linear-gradient(135deg,#e2e8f0,#f8fafc)}
+.product-image-overlay{position:absolute;left:10px;right:10px;top:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.image-tag{background:rgba(15,23,42,.78);color:#fff;border-radius:999px;padding:6px 8px;font-size:10px;font-weight:800;backdrop-filter:blur(8px)}
+.product-body{padding:14px}.product-title{margin:5px 0 4px;font-size:17px;letter-spacing:-.25px}.product-desc{margin:0 0 10px;line-height:1.45}.seller-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.seller-name-line{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}.seller-name-line b{font-size:12px}.seller-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}.price-row{display:flex;align-items:end;justify-content:space-between;gap:8px;margin-top:10px}.price-large{font-size:20px;font-weight:950;letter-spacing:-.5px}.market-empty{padding:28px 18px;text-align:center}
+.profile-trust{margin-top:12px}.profile-photo-wrap{position:relative;display:inline-block}.profile-photo-wrap .photo-edit{position:absolute;right:-4px;bottom:-4px;width:30px;height:30px;border-radius:50%;border:2px solid var(--surface);background:var(--accent);color:var(--accentText);display:grid;place-items:center;font-size:12px}
+@media(max-width:560px){.market-trust-strip{grid-template-columns:1fr 1fr}.market-trust-item:last-child{grid-column:1/-1}}
+@media(min-width:700px){.bottom-nav{display:none}.hero{padding:28px}.modal-backdrop{align-items:center}.modal{border-radius:24px}}
+
+/* ShopU premium marketplace refresh */
+:root{
+  --shopu-ink:#0b1220;
+  --shopu-blue:#2563eb;
+  --shopu-cyan:#06b6d4;
+  --shopu-purple:#7c3aed;
+  --shopu-green:#10b981;
+}
+body{background:
+  radial-gradient(900px 360px at 50% -120px,rgba(37,99,235,.13),transparent 65%),
+  var(--bg);
+}
+header{background:color-mix(in srgb,var(--bg) 76%,transparent)}
+.logo{
+  width:42px;height:42px;border-radius:14px;
+  background:linear-gradient(135deg,#111827,#2563eb 55%,#06b6d4);
+  box-shadow:0 8px 24px rgba(37,99,235,.24);
+}
+.brand-title{font-size:21px}
+.hero{
+  min-height:248px;
+  padding:25px;
+  border:1px solid rgba(255,255,255,.12);
+  background:
+    radial-gradient(circle at 88% 8%,rgba(34,211,238,.28),transparent 28%),
+    radial-gradient(circle at 5% 100%,rgba(124,58,237,.32),transparent 35%),
+    linear-gradient(135deg,#08111f 0%,#111c35 48%,#173b67 100%);
+  box-shadow:0 22px 55px rgba(15,23,42,.22);
+}
+.hero:before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.055),transparent 65%);
+  transform:translateX(-80%);
+  animation:shopuShine 7s ease-in-out infinite;
+}
+@keyframes shopuShine{50%{transform:translateX(80%)}100%{transform:translateX(80%)}}
+.hero h1{font-size:clamp(30px,8vw,42px);line-height:1.02;max-width:600px}
+.hero p{font-size:14px;line-height:1.55;max-width:650px}
+.hero-actions{margin-top:19px}
+.hero-chip{backdrop-filter:blur(10px);padding:9px 12px}
+.hero .hero-quick{
+  position:relative;z-index:2;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;margin-top:20px;max-width:520px;
+}
+.hero-quick button{
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.09);color:#fff;
+  border-radius:15px;padding:12px;text-align:left;
+  font-weight:800;transition:.18s transform,.18s background;
+}
+.hero-quick button:active{transform:scale(.98);background:rgba(255,255,255,.16)}
+.hero-quick small{display:block;color:rgba(255,255,255,.65);font-weight:500;margin-top:2px}
+.tabs{padding-top:7px}
+.tabs button{box-shadow:0 4px 14px rgba(15,23,42,.035)}
+.market-head{padding:3px 2px}
+.market-title{font-size:28px}
+.market-trust-strip{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0;
+}
+.market-trust-item{
+  min-height:100px;padding:13px;border-radius:17px;
+  background:linear-gradient(145deg,var(--surface),color-mix(in srgb,var(--surface) 90%,var(--link)));
+  border:1px solid var(--border);box-shadow:0 8px 24px rgba(15,23,42,.045);
+}
+.market-trust-item b{display:block;font-size:12px;margin-bottom:6px}
+.market-trust-item span{font-size:11px;line-height:1.45;color:var(--muted)}
+.toolbar{margin-top:15px}
+.searchbox input{height:48px}
+#products .card{box-shadow:0 10px 28px rgba(15,23,42,.055)}
+.product-card{border-radius:22px}
+.product-image{height:235px;background:linear-gradient(145deg,var(--soft),rgba(37,99,235,.05))}
+.bottom-nav{
+  background:color-mix(in srgb,var(--bg) 84%,transparent);
+  backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+}
+.bottom-inner button{font-size:10px}
+.bottom-inner button.active{color:var(--link)}
+.section-title{font-size:22px;letter-spacing:-.5px}
+.card{box-shadow:0 8px 28px rgba(15,23,42,.045)}
+.btn.primary{
+  background:linear-gradient(135deg,#2563eb,#4f46e5);
+  box-shadow:0 8px 20px rgba(37,99,235,.18);
+}
+@media(max-width:650px){
+  .market-trust-strip{grid-template-columns:1fr}
+  .market-trust-item{min-height:auto}
+}
+@media(min-width:700px){
+  .hero .hero-quick{grid-template-columns:repeat(3,minmax(0,1fr));max-width:720px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="logo">U</div>
+      <div><div class="brand-title">ShopU</div><div class="brand-sub">Marketplace · Escrow · Trust</div></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center"><button id="profileAvatarButton" class="icon-btn" onclick="openProfile()" aria-label="Profile">U</button><button class="icon-btn" onclick="tab('notify',document.querySelector('[data-tab=notify]'))" aria-label="Notifications">🔔<span id="unreadBadge" class="badge hide">0</span></button></div>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div style="position:relative;z-index:2">
+      <div class="hero-chip" style="display:inline-flex;margin-bottom:12px">✦ SHOPU MARKETPLACE</div>
+      <h1 id="welcome">Buy smarter. Sell confidently.</h1>
+      <p>Discover trusted listings, keep transactions protected with ShopU escrow, and manage orders, sellers and support from one place.</p>
+      <div class="hero-actions">
+        <span class="hero-chip">🛡 Escrow protected</span>
+        <span class="hero-chip">✓ Trust signals</span>
+        <span class="hero-chip">⚡ Telegram ready</span>
+      </div>
+      <div class="hero-quick">
+        <button type="button" onclick="tab('market',document.querySelector('[data-tab=market]'))">🛍 Browse market<small>Find products and sellers</small></button>
+        <button type="button" onclick="tab('escrow',document.querySelector('[data-tab=escrow]'))">🔐 Secure an escrow<small>Protect a private transaction</small></button>
+        <button type="button" onclick="tab('seller',document.querySelector('[data-tab=seller]'))">🏪 Start selling<small>Create a professional listing</small></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="market" class="active" onclick="tab('market',this)">🛍 Market</button>
+    <button data-tab="orders" onclick="tab('orders',this)">📦 Orders</button>
+    <button data-tab="escrow" onclick="tab('escrow',this)">🔐 Escrow</button>
+    <button data-tab="seller" onclick="tab('seller',this)">🏪 Sell</button>
+    <button data-tab="notify" onclick="tab('notify',this)">🔔 Alerts</button>
+    <button data-tab="support" onclick="tab('support',this)">💬 Support</button>
+  </div>
+
+  <section id="market">
+    <div class="market-head">
+      <div><div class="market-kicker">ShopU marketplace</div><div class="market-title">A better way to shop.</div><p class="market-sub">Professional listings, visible seller reputation and escrow protection at every step.</p></div>
+      <span class="pill">🛡 Protected</span>
+    </div>
+    <div class="market-trust-strip">
+      <div class="market-trust-item"><b>Escrow protected</b><span>Funds stay protected until delivery is confirmed.</span></div>
+      <div class="market-trust-item"><b>Trust signals</b><span>Verified and Trusted badges are clearly explained.</span></div>
+      <div class="market-trust-item"><b>Buyer reviews</b><span>See transaction-based feedback before you buy.</span></div>
+    </div>
+    <details class="card" style="margin-top:0"><summary><b>How seller badges work</b></summary><div style="display:grid;gap:8px;margin-top:10px"><div><span class="trust-badge trusted"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:14px;height:14px"><path d="M12 2.8 14.3 5l3.2-.2.9 3 2.6 1.8-1.4 2.9.7 3.1-3 1.2-1.4 2.8-3.1-.8-2.8 1.4-2.1-2.4-3.2-.3-.3-3.2-2.4-2.1 1.4-2.8-.8-3.1 3-1.2L9 3.8l3 .9Z" stroke="currentColor" stroke-width="1.5"/><path d="m8.2 12.1 2.3 2.2 5.3-5.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Trusted Vendor</span></span> <span class="muted">A ShopU reliability designation for sellers the platform considers dependable.</span></div><div><span class="trust-badge verified"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:14px;height:14px"><path d="M12 3.2 19 6v5.1c0 4.4-2.9 7.8-7 9.7-4.1-1.9-7-5.3-7-9.7V6l7-2.8Z" stroke="currentColor" stroke-width="1.8"/><path d="m8.5 12 2.2 2.2 4.8-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Verified Vendor</span></span> <span class="muted">The seller completed ShopU's configured verification process.</span></div><div><span class="trust-badge caution"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:14px;height:14px"><path d="m12 3 9 17H3L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 8v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg><span>Proceed with caution</span></span> <span class="muted">Disputes, complaints or other risk signals require extra care.</span></div></div></details>
+    <div class="toolbar">
+      <div class="searchbox"><span class="search-icon">⌕</span><input id="q" aria-label="Search products" placeholder="Search products, categories or sellers" oninput="debouncedProducts()"></div>
+      <select id="categoryFilter" aria-label="Filter category" onchange="loadProducts()"><option value="">All categories</option></select>
+    </div>
+    <div id="categoryChips" class="market-filter"></div>
+    <div id="products">Loading marketplace…</div>
+  </section>
+
+  <section id="orders" class="hide"><div class="section-title">Your orders</div><div class="muted">Track delivery, confirmation and disputes.</div><div id="orderList">Loading…</div></section>
+
+  <section id="escrow" class="hide">
+    <div class="card">
+      <div class="section-title">Private ShopU Escrow</div>
+      <p class="muted">For transactions outside the marketplace. Create an escrow, share its ID, then let the buyer join and fund it.</p>
+      <label>Title</label><input class="field" id="etitle" placeholder="What are you trading?">
+      <label>Amount</label><input class="field" id="eamount" type="number" step="0.01" min="0.01" inputmode="decimal">
+      <label>Currency</label><input class="field" id="ecurrency" value="USD">
+      <label>Description</label><textarea class="field" id="edesc" rows="4" placeholder="Describe exactly what is being exchanged."></textarea>
+      <button class="btn primary full" onclick="createEscrow()">Create secure escrow</button>
+      <p id="ecreated"></p>
+    </div>
+    <div class="card">
+      <div class="section-title">Open an escrow</div>
+      <p class="muted">Enter the ShopU escrow ID shared by the other participant.</p>
+      <input class="field" id="eid" placeholder="SU-XXXXXXXXXXXX">
+      <button class="btn primary full" style="margin-top:9px" onclick="joinEscrow()">Join escrow</button>
+      <div id="einfo"></div>
+    </div>
+  </section>
+
+  <section id="seller" class="hide">
+    <div class="card">
+      <div class="section-title">Create a listing</div>
+      <p class="muted">Clear, complete listings build buyer trust and make disputes easier to resolve fairly.</p>
+      <label>Title</label><input class="field" id="ptitle" placeholder="Clear product name">
+      <label>Category</label><input class="field" id="pcat" placeholder="Electronics, fashion…">
+      <label>Condition</label><input class="field" id="pcondition" placeholder="New, used, refurbished…">
+      <label>Price</label><input class="field" id="pprice" type="number" step="0.01" min="0.01" inputmode="decimal">
+      <label>Currency</label><input class="field" id="pcurrency" value="USD">
+      <label>Listing photo</label><input class="field" id="pimage" type="file" accept="image/jpeg,image/png,image/webp">
+      <p class="muted">JPEG, PNG or WebP · max 5 MB.</p>
+      <label>Full description</label><textarea class="field" id="pdesc" rows="7" placeholder="Condition, defects, limitations, missing parts, accessories, compatibility, delivery details and everything a reasonable buyer should know."></textarea>
+      <label>Seller terms / return details</label><textarea class="field" id="pterms" rows="4" placeholder="Optional terms that do not conflict with ShopU rules."></textarea>
+      <div class="card" style="margin:14px 0 0;background:var(--soft)">
+        <b>Seller publishing terms</b><p class="small" id="listingPolicy">Loading terms…</p>
+        <label><input type="checkbox" id="pdisclose"> I confirm that I have disclosed known material details, defects and limitations.</label>
+        <label><input type="checkbox" id="pfee"> I have reviewed and accept the applicable ShopU fees and seller terms.</label>
+      </div>
+      <button class="btn primary full" style="margin-top:12px" onclick="createProduct()">Preview & publish listing</button>
+      <p id="pmsg"></p>
+    </div>
+  </section>
+
+  <section id="support" class="hide">
+    <div class="section-title">Support</div><div class="muted">Start with ShopU support, then request a live agent whenever you need one.</div>
+    <div class="card"><label>Subject</label><input class="field" id="supportSubject" maxlength="200" placeholder="What do you need help with?">
+      <label>Message</label><textarea class="field" id="supportMessage" maxlength="5000" rows="5" placeholder="Describe the issue clearly. You can include an order number."></textarea>
+      <label>Related order (optional)</label><input class="field" id="supportOrder" inputmode="numeric" placeholder="Order #">
+      <button class="btn primary full" style="margin-top:10px" onclick="createSupportTicket()">Start support chat</button></div>
+    <div id="supportList">Loading support…</div><div id="agentConsole" class="hide"><div class="section-title" style="margin-top:20px">Agent console</div><div id="agentQueue"></div></div>
+  </section>
+
+<section id="notify" class="hide">
+    <div class="section-title">Notifications</div>
+    <div class="muted">Updates about your ShopU activity.</div>
+    <div id="notifications">Loading…</div>
+  </section>
+</main>
+
+<nav class="bottom-nav">
+  <div class="bottom-inner">
+    <button class="active" data-bottom="market" onclick="tab('market',document.querySelector('[data-tab=market]'))"><span class="nav-icon">🛍</span>Market</button>
+    <button data-bottom="orders" onclick="tab('orders',document.querySelector('[data-tab=orders]'))"><span class="nav-icon">📦</span>Orders</button>
+    <button data-bottom="escrow" onclick="tab('escrow',document.querySelector('[data-tab=escrow]'))"><span class="nav-icon">🔐</span>Escrow</button>
+    <button data-bottom="seller" onclick="tab('seller',document.querySelector('[data-tab=seller]'))"><span class="nav-icon">🏪</span>Sell</button>
+    <button data-bottom="notify" onclick="tab('notify',document.querySelector('[data-tab=notify]'))"><span class="nav-icon">🔔</span>Alerts</button>
+    <button data-bottom="support" onclick="tab('support',document.querySelector('[data-tab=support]'))"><span class="nav-icon">💬</span>Support</button>
+  </div>
+</nav>
+
+<div id="profileModal" class="modal-backdrop" onclick="if(event.target===this)closeProfile()"><div class="modal"><div class="modal-handle"></div><button class="icon-btn modal-close" onclick="closeProfile()">×</button><div class="profile-head"><div class="profile-photo-wrap"><img id="profileImage" class="avatar avatar-lg" alt="Profile photo"><span class="photo-edit">✎</span></div><div><div class="section-title" id="profileName">Your profile</div><div class="muted" id="profileRole"></div><div id="profileTrust" class="profile-trust"></div></div></div><div class="card"><label>Profile photo</label><input class="field" id="profilePhoto" type="file" accept="image/jpeg,image/png,image/webp"><p class="muted">Your profile photo is available to other ShopU users where appropriate. JPEG, PNG or WebP · max 5 MB.</p><button class="btn primary full" onclick="uploadProfilePhoto()">Save profile photo</button></div></div></div>
+
+<div id="reviewModal" class="modal-backdrop" onclick="if(event.target===this)closeReview()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="icon-btn modal-close" onclick="closeReview()" aria-label="Close">×</button>
+    <div class="section-title">Review your ShopU transaction</div>
+    <p id="reviewContext" class="muted"></p>
+    <div class="review-form">
+      <label>Rating</label>
+      <div id="starPicker" class="star-picker" role="radiogroup" aria-label="Rating"></div>
+      <label for="reviewComment">Your review</label>
+      <textarea id="reviewComment" class="field" maxlength="2000" placeholder="Share your experience with the seller."></textarea>
+      <button class="btn primary full" style="margin-top:12px" onclick="submitReview()">Submit review</button>
+    </div>
+  </div>
+</div>
+<div id="detailModal" class="modal-backdrop" onclick="if(event.target===this)closeDetail()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="icon-btn modal-close" onclick="closeDetail()" aria-label="Close">×</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+<div id="reportModal" class="modal-backdrop" onclick="if(event.target===this)closeReport()"><div class="modal"><div class="modal-handle"></div><button class="icon-btn modal-close" onclick="closeReport()" aria-label="Close">×</button><div class="section-title">Report seller</div><p class="muted">Use this for a genuine marketplace concern. ShopU will review the report and related evidence.</p><input type="hidden" id="reportSellerId"><label>Reason</label><select class="field" id="reportCategory"><option value="inaccurate_listing">Inaccurate listing</option><option value="payment">Payment issue</option><option value="delivery">Delivery issue</option><option value="conduct">Seller conduct</option><option value="other">Other</option></select><label>Description</label><textarea class="field" id="reportDescription" maxlength="10000" rows="6" placeholder="Describe what happened, including relevant order details where possible."></textarea><label>Related order (optional)</label><input class="field" id="reportOrderId" inputmode="numeric" placeholder="Order #"><button class="btn primary full" style="margin-top:12px" onclick="submitVendorReport()">Submit report</button></div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+const tg=window.Telegram&&window.Telegram.WebApp;
+if(tg){
+  tg.ready(); tg.expand();
+  try{tg.setHeaderColor('bg_color');tg.setBackgroundColor('bg_color')}catch{}
+  tg.onEvent?.('themeChanged',()=>document.documentElement.style.colorScheme=tg.colorScheme||'light');
+}
+const init=()=>tg?.initData||'';
+let productTimer=null;
+let currentProducts=[];
+
+async function api(path,opt={}){
+  opt.headers=opt.headers||{};
+  if(!(opt.body instanceof FormData)) opt.headers['Content-Type']='application/x-www-form-urlencoded';
+  let body=opt.body;
+  if(body instanceof URLSearchParams) body.set('init_data',init());
+  else if(body instanceof FormData) body.append('init_data',init());
+  else {body=body||new URLSearchParams();body.set('init_data',init())}
+  const r=await fetch(path,{...opt,body});
+  let d={};try{d=await r.json()}catch{}
+  if(!r.ok)throw Error(d.error||'Request failed');
+  return d;
+}
+function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function toast(message){
+  const el=document.getElementById('toast');el.textContent=message;el.classList.add('show');
+  clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>el.classList.remove('show'),3000);
+}
+function tab(id,b){
+  document.querySelectorAll('main section').forEach(x=>x.classList.add('hide'));
+  document.getElementById(id).classList.remove('hide');
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+  if(b)b.classList.add('active');
+  document.querySelectorAll('.bottom-nav button').forEach(x=>x.classList.toggle('active',x.dataset.bottom===id));
+  if(id==='market')loadProducts();
+  if(id==='orders')loadOrders();
+  if(id==='notify')loadNotifications();
+  if(id==='support')loadSupport();
+}
+function debouncedProducts(){clearTimeout(productTimer);productTimer=setTimeout(loadProducts,250)}
+function stars(rating){const n=Math.round(Number(rating||0));return '★'.repeat(Math.max(0,Math.min(5,n)))+'☆'.repeat(5-Math.max(0,Math.min(5,n)))}
+function imageMarkup(url,alt=''){
+  return url?`<img src="${esc(url)}" alt="${esc(alt)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=&quot;placeholder&quot;>🛍️</div>'">`:'<div class="placeholder">🛍️</div>';
+}
+function trustIcon(key){
+  if(key==='trusted') return '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.8 14.3 5l3.2-.2.9 3 2.6 1.8-1.4 2.9.7 3.1-3 1.2-1.4 2.8-3.1-.8-2.8 1.4-2.1-2.4-3.2-.3-.3-3.2-2.4-2.1 1.4-2.8-.8-3.1 3-1.2L9 3.8l3 .9Z" stroke="currentColor" stroke-width="1.5"/><path d="m8.2 12.1 2.3 2.2 5.3-5.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(key==='verified') return '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.2 19 6v5.1c0 4.4-2.9 7.8-7 9.7-4.1-1.9-7-5.3-7-9.7V6l7-2.8Z" stroke="currentColor" stroke-width="1.8"/><path d="m8.5 12 2.2 2.2 4.8-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  return '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 9 17H3L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 8v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg>';
+}
+function trustBadgeMarkup(trust,compact=false){
+  const parts=[];const primary=trust?.primary;
+  if(primary&&['trusted','verified'].includes(primary.key)) parts.push(`<span class="trust-badge ${esc(primary.key)}" title="${esc(primary.description||primary.label)}">${trustIcon(primary.key)}<span>${esc(primary.label)}</span></span>`);
+  if(trust?.caution) parts.push(`<span class="trust-badge caution" title="${esc((trust.caution_reasons||[]).join(', ')||'Seller has a caution signal.')}" >${trustIcon('caution')}<span>${compact?'Caution':'Proceed with caution'}</span></span>`);
+  return parts.join('');
+}
+function cautionMarkup(trust){
+  if(!trust?.caution)return '';
+  const reason=(trust.caution_reasons||[]).join(' · ')||'Recent disputes or complaints require extra care.';
+  return `<div class="caution-strip">${trustIcon('caution')}<div><b>Proceed with caution</b><div>${esc(reason)}</div></div></div>`;
+}
+function updateCategoryOptions(categories){
+  const select=document.getElementById('categoryFilter');const old=select.value;
+  select.innerHTML='<option value="">All categories</option>'+categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  select.value=categories.includes(old)?old:'';
+  const chips=document.getElementById('categoryChips');
+  const items=[{value:'',label:'All'}].concat(categories.map(c=>({value:c,label:c}))).slice(0,14);
+  chips.innerHTML=items.map(c=>`<button type="button" class="pill ${c.value===select.value?'active':''}" data-category="${esc(c.value)}">${esc(c.label)}</button>`).join('');
+  chips.querySelectorAll('[data-category]').forEach(button=>button.addEventListener('click',()=>setCategoryFilter(button.dataset.category)));
+}
+function setCategoryFilter(value){document.getElementById('categoryFilter').value=value;loadProducts()}
+async function boot(){
+  try{
+    const d=await api('/miniapp/bootstrap/',{method:'POST'});
+    welcome.textContent='Welcome to ShopU, '+(d.user.username||'there')+' 👋';
+    if(d.unread_notifications)showUnread(d.unread_notifications);
+    presenceSafe(d.user.status); updateProfileAvatar(d.user); if(d.is_support_agent){agentConsole.classList.remove('hide');loadAgentQueue();}
+  }catch{toast('Open ShopU from Telegram for full account features')}
+}
+function presenceSafe(status){/* Header presence is intentionally omitted from the compact redesign. */}
+function showUnread(n){
+  const b=document.getElementById('unreadBadge');b.textContent=n>99?'99+':n;b.classList.toggle('hide',!n);
+}
+async function loadProducts(){
+  const q=document.getElementById('q').value;
+  const category=document.getElementById('categoryFilter').value;
+  try{
+    const d=await fetch('/miniapp/products/?q='+encodeURIComponent(q)+'&category='+encodeURIComponent(category)).then(r=>r.json());
+    if(d.error)throw Error(d.error);
+    currentProducts=d.products||[];updateCategoryOptions(d.categories||[]);
+    products.innerHTML=currentProducts.length?'<div class="grid">'+currentProducts.map(p=>`
+      <article class="card product-card" data-id="${p.id}">
+        <div class="product-image">${imageMarkup(p.image,p.name)}<div class="product-image-overlay"><span class="image-tag">${esc(p.category||'Marketplace')}</span><span>${trustBadgeMarkup(p.trust,true)}</span></div></div>
+        <div class="product-body">
+          <div class="muted">${esc(p.condition||'Condition not specified')}</div>
+          <h2 class="product-title">${esc(p.name)}</h2>
+          <p class="product-desc">${esc((p.description||'').slice(0,150))}${(p.description||'').length>150?'…':''}</p>
+          <div class="price-row"><span class="price-large">${esc(p.price)} ${esc(p.currency)}</span><span class="status ${p.seller_status==='active_now'?'green':''}">${p.seller_status==='active_now'?'🟢 Active':'⚪ Offline'}</span></div>
+          <div class="seller-row" style="margin-top:12px"><span class="seller-mini">${p.seller_image?`<img class="avatar" src="${esc(p.seller_image)}" alt="">`:'<span class="avatar">U</span>'}<span><span class="seller-name-line"><b>${esc(p.seller)}</b></span><span class="seller-badges">${trustBadgeMarkup(p.trust,true)}</span></span></span><span class="pill">v${esc(p.listing_version)}</span></div>
+          ${cautionMarkup(p.trust)}
+          <button class="btn primary full" style="margin-top:12px" onclick="openDetail(${p.id})">View product</button>
+        </div>
+      </article>`).join('')+'</div>':'<div class="card market-empty"><div class="empty-icon">🛍️</div><b>No products found</b><p>Try another search or category.</p></div>';
+  }catch(e){products.innerHTML='<div class="card empty"><div class="empty-icon">⚠️</div><b>Marketplace unavailable</b><p>'+esc(e.message)+'</p><button class="btn" onclick="loadProducts()">Retry</button></div>'}
+}
+async function openDetail(id){
+  const p=currentProducts.find(x=>x.id===id);if(!p)return;
+  detailContent.innerHTML=`<div class="modal-image">${imageMarkup(p.image,p.name)}</div>
+    <div class="muted" style="margin-top:13px">${esc(p.category||'General')} · ${esc(p.condition||'Condition not specified')}</div>
+    <div class="detail-title">${esc(p.name)}</div>
+    <div class="price">${esc(p.price)} ${esc(p.currency)}</div>
+    <div id="vendorDetail" class="seller-box"><span>Loading seller trust profile…</span></div>
+    <h3>Description</h3><p style="white-space:pre-wrap;line-height:1.55">${esc(p.description)}</p>
+    ${p.seller_terms?`<details><summary><b>Seller terms</b></summary><p style="white-space:pre-wrap">${esc(p.seller_terms)}</p></details>`:''}
+    <div class="note" style="margin-top:14px">🛡 Your marketplace purchase is placed into ShopU escrow. Review the product information and seller disclosures before buying.</div>
+    <button class="btn primary full" style="margin-top:12px" onclick="buy(${p.id})">Review & buy securely</button>`;
+  document.getElementById('detailModal').classList.add('show');
+  try{
+    const v=await fetch('/miniapp/vendor/'+p.seller_id+'/').then(r=>r.json());
+    if(v.error)throw Error(v.error);
+    const rating=v.stats?.average_rating;
+    vendorDetail.innerHTML=`<div style="width:100%"><div class="row"><div class="seller-mini">${v.seller.profile_image?`<img class="avatar avatar-lg" src="${esc(v.seller.profile_image)}" alt="">`:'<span class="avatar avatar-lg">U</span>'}<div><div class="seller-name">${esc(v.seller.username)}</div><div class="seller-badges" style="margin-top:6px">${trustBadgeMarkup(v.trust)}</div>
+      <div class="muted" style="margin-top:5px">${v.seller.status==='active_now'?'🟢 Active now':'⚪ Offline'} · ${v.stats?.completed_transactions||0} completed</div></div>
+      <div style="text-align:right"><b>${rating?esc(rating):'—'}</b><div class="stars">${rating?stars(rating):'☆☆☆☆☆'}</div><div class="muted">${v.stats?.review_count||0} reviews</div></div></div>
+      ${cautionMarkup(v.trust)}
+      <div class="muted" style="margin-top:9px">${v.stats?.dispute_count||0} transaction dispute(s) · ${v.trust?.metrics?.open_complaint_count||0} open complaint(s)</div>
+      <button class="btn" style="margin-top:10px" onclick="openReport(${v.seller.id})">Report seller</button>
+      ${v.reviews?.length?`<div class="review-section"><h3>Buyer reviews</h3>${v.reviews.map(r=>`<div class="review"><div class="review-head"><b>${esc(r.buyer)}</b><span class="stars">${stars(r.rating)}</span></div><div class="review-comment">${esc(r.comment||'No written comment.')}</div><div class="muted">${new Date(r.created_at).toLocaleDateString()}${r.edited?' · edited':''}</div></div>`).join('')}</div>`:'<div class="review-section"><h3>Buyer reviews</h3><p class="muted">No reviews yet.</p></div>'}</div>`;
+  }catch{vendorDetail.innerHTML='<span class="muted">Seller trust profile unavailable.</span>'}
+}
+function openReport(sellerId){document.getElementById('reportSellerId').value=sellerId;document.getElementById('reportDescription').value='';document.getElementById('reportOrderId').value='';document.getElementById('reportModal').classList.add('show')}
+function closeReport(){document.getElementById('reportModal').classList.remove('show')}
+async function submitVendorReport(){const sellerId=document.getElementById('reportSellerId').value;const description=document.getElementById('reportDescription').value.trim();if(description.length<20){toast('Please describe the issue in at least 20 characters.');return}const f=new FormData();f.append('category',document.getElementById('reportCategory').value);f.append('description',description);if(document.getElementById('reportOrderId').value.trim())f.append('order_id',document.getElementById('reportOrderId').value.trim());try{await api('/miniapp/vendor/'+sellerId+'/report/',{method:'POST',body:f});closeReport();toast('Report submitted for ShopU review.')}catch(e){toast(e.message)}}
+function closeDetail(){document.getElementById('detailModal').classList.remove('show')}
+async function buy(id){
+  const p=currentProducts.find(x=>x.id===id);
+  if(!p)return;
+  if(!window.confirm('I have reviewed the product description, condition and seller disclosures. Continue to place this order into ShopU escrow?'))return;
+  try{
+    const d=await api('/miniapp/products/'+id+'/buy/',{method:'POST',body:new URLSearchParams({disclosure_acknowledged:'true'})});
+    closeDetail();toast('Order #'+d.order_id+' is protected by ShopU escrow.');tab('orders',document.querySelector('[data-tab=orders]'));
+  }catch(e){toast(e.message)}
+}
+async function loadOrders(){
+  try{
+    const d=await api('/miniapp/orders/',{method:'POST'});
+    orderList.innerHTML=d.orders.length?d.orders.map(o=>`<div class="card">
+      <div class="row"><b>Order #${o.id}</b><span class="pill">${esc(o.status)}</span></div>
+      <p>${esc(o.product)} — <b>${esc(o.amount)} ${esc(o.currency)}</b></p>
+      <div class="muted">${o.role==='buyer'?'Buyer':'Seller'} · ${o.deadline?'Auto-release: '+new Date(o.deadline).toLocaleString():''}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      ${o.can_deliver?`<button class="btn primary" onclick="deliver(${o.id})">Mark delivered</button>`:''}
+      ${o.can_confirm?`<button class="btn primary" onclick="confirmOrder(${o.id})">Confirm receipt</button>`:''}
+      ${o.can_dispute?`<button class="btn" onclick="dispute(${o.id})">Open dispute</button>`:''}
+      ${o.can_review?`<button class="btn primary" onclick="openReview(${o.id},'${esc(o.product)}')">Leave a review</button>`:''}
+      ${o.review_id?`<span class="pill">✓ Reviewed</span>`:''}
+      </div>
+      ${o.review_locked_reason?`<p class="muted" style="margin-top:9px">${esc(o.review_locked_reason)}</p>`:''}
+      </div>`).join(''):'<div class="card empty"><div class="empty-icon">📦</div><b>No orders yet</b><p>Your purchases and sales will appear here.</p></div>';
+  }catch(e){orderList.innerHTML='<div class="card empty">Unable to load orders.<br>'+esc(e.message)+'</div>'}
+}
+async function deliver(id){try{await api('/miniapp/orders/'+id+'/deliver/',{method:'POST'});toast('Order marked delivered.');loadOrders()}catch(e){toast(e.message)}}
+async function confirmOrder(id){try{await api('/miniapp/orders/'+id+'/confirm/',{method:'POST'});toast('Receipt confirmed and funds released.');loadOrders()}catch(e){toast(e.message)}}
+async function dispute(id){if(!window.confirm('Open a dispute for this order?'))return;try{await api('/miniapp/orders/'+id+'/dispute/',{method:'POST'});toast('Dispute opened.');loadOrders()}catch(e){toast(e.message)}}
+let activeReviewOrderId=null;
+let activeReviewId=null;
+let activeReviewRating=0;
+
+function renderStarPicker(){
+  starPicker.innerHTML=[1,2,3,4,5].map(n=>`<button type="button" class="${n<=activeReviewRating?'selected':''}" aria-label="${n} star${n>1?'s':''}" onclick="setReviewRating(${n})">★</button>`).join('');
+}
+function setReviewRating(n){activeReviewRating=n;renderStarPicker()}
+function openReview(orderId,productName){
+  activeReviewOrderId=orderId;
+  activeReviewId=null;
+  activeReviewRating=0;
+  reviewComment.value='';
+  reviewContext.textContent='Order #'+orderId+' · '+productName;
+  renderStarPicker();
+  reviewModal.classList.add('show');
+}
+function closeReview(){reviewModal.classList.remove('show')}
+async function submitReview(){
+  if(!activeReviewRating){toast('Please choose a rating.');return}
+  try{
+    const body=new URLSearchParams({order_id:String(activeReviewOrderId),rating:String(activeReviewRating),comment:reviewComment.value});
+    const d=await api('/miniapp/reviews/create/',{method:'POST',body});
+    toast('Review submitted. Thank you.');
+    closeReview();
+    loadOrders();
+  }catch(e){toast(e.message)}
+}
+
+async function createProduct(){
+  const f=new FormData();[['title',ptitle.value],['category',pcat.value],['condition',pcondition.value],['price',pprice.value],['currency',pcurrency.value],['description',pdesc.value],['seller_terms',pterms.value],['disclosure_acknowledged',String(pdisclose.checked)],['fee_acknowledged',String(pfee.checked)]].forEach(([k,v])=>f.append(k,v)); if(pimage.files[0])f.append('image',pimage.files[0]);
+  try{await api('/miniapp/products/create/',{method:'POST',body:f});pmsg.textContent='Listing published successfully.';toast('Your listing is live.');loadProducts();tab('market',document.querySelector('[data-tab=market]'))}
+  catch(e){pmsg.textContent=e.message}
+}
+async function createEscrow(){try{const d=await api('/miniapp/escrow/create/',{method:'POST',body:new URLSearchParams({title:etitle.value,amount:eamount.value,currency:ecurrency.value,description:edesc.value})});ecreated.innerHTML='<b>Escrow ID: '+esc(d.escrow_id)+'</b><br><span class="muted">Copy this ID and send it to the buyer.</span>';toast('Escrow created securely.')}catch(e){ecreated.textContent=e.message}}
+async function showEscrowInfo(){
+  const id=eid.value.trim();if(!id)return;
+  try{const d=await api('/miniapp/escrow/'+encodeURIComponent(id)+'/');const e=d.escrow;
+    einfo.innerHTML=`<div class="card" style="margin-top:12px"><b>${esc(e.title)}</b><p class="muted">${esc(e.description)}</p><div class="row"><b>${esc(e.amount)} ${esc(e.currency)}</b><span class="pill">${esc(e.status)}</span></div></div>`;
+  }catch{}
+}
+async function fundEscrow(){try{const id=eid.value.trim();const d=await api('/miniapp/escrow/'+encodeURIComponent(id)+'/fund/',{method:'POST'});einfo.innerHTML='Funded. Deadline: '+new Date(d.deadline).toLocaleString()+' <button class="btn primary" onclick="markPrivateDelivered()">Mark delivered</button> <button class="btn" onclick="releasePrivate()">Release to seller</button>';toast('Escrow funded.')}catch(e){toast(e.message)}}
+async function markPrivateDelivered(){try{const id=eid.value.trim();const d=await api('/miniapp/escrow/'+encodeURIComponent(id)+'/deliver/',{method:'POST'});einfo.innerHTML='Delivered. Confirmation deadline: '+new Date(d.deadline).toLocaleString();toast('Private escrow marked delivered.')}catch(e){toast(e.message)}}
+async function releasePrivate(){try{const id=eid.value.trim();await api('/miniapp/escrow/'+encodeURIComponent(id)+'/release/',{method:'POST'});einfo.textContent='Released to seller.';toast('Escrow released.')}catch(e){toast(e.message)}}
+async function joinEscrow(){try{const id=eid.value.trim();const d=await api('/miniapp/escrow/'+encodeURIComponent(id)+'/join/',{method:'POST'});einfo.innerHTML='Joined '+esc(d.escrow_id)+'. <button class="btn primary" onclick="fundEscrow()">Fund escrow</button>';toast('Escrow joined.')}catch(e){toast(e.message)}}
+async function loadNotifications(){
+  try{
+    const d=await api('/miniapp/notifications/',{method:'POST'});
+    const unread=d.notifications.filter(n=>!n.read).length;showUnread(unread);
+    notifications.innerHTML=d.notifications.length?d.notifications.map(n=>`<div class="card" style="${n.read?'opacity:.7':''}">
+      <div class="row"><b>${esc(n.title)}</b>${n.read?'':'<span class="pill">NEW</span>'}</div>
+      <p>${esc(n.message)}</p><div class="row"><span class="muted">${new Date(n.created_at).toLocaleString()}</span>${n.read?'':`<button class="btn" onclick="markRead(${n.id})">Mark read</button>`}</div>
+    </div>`).join(''):`<div class="card empty"><div class="empty-icon">🔔</div><b>You are all caught up</b></div>`;
+  }catch(e){notifications.innerHTML='<div class="card empty">'+esc(e.message)+'</div>'}
+}
+async function markRead(id){try{await api('/miniapp/notifications/'+id+'/read/',{method:'POST'});loadNotifications()}catch(e){toast(e.message)}}
+function updateProfileAvatar(u){const b=document.getElementById('profileAvatarButton'); if(b)b.innerHTML=u.profile_image?`<img class="avatar" src="${esc(u.profile_image)}" alt="">`:'U';}
+async function openProfile(){try{const d=await api('/miniapp/profile/',{method:'POST'});const u=d.profile;profileName.textContent=u.username;profileRole.textContent=(u.role||'buyer')+' · '+(u.status==='active_now'?'Active now':'Offline');profileImage.src=u.profile_image||'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="76" height="76"><rect width="100%" height="100%" rx="24" fill="%23e2e8f0"/><text x="50%" y="55%" text-anchor="middle" font-size="28">U</text></svg>';profileTrust.innerHTML='';if(u.role==='seller'){try{const v=await fetch('/miniapp/vendor/'+u.id+'/').then(r=>r.json());profileTrust.innerHTML=trustBadgeMarkup(v.trust)+cautionMarkup(v.trust)}catch{}}profileModal.classList.add('show')}catch(e){toast(e.message)}}
+function closeProfile(){profileModal.classList.remove('show')}
+async function uploadProfilePhoto(){const file=profilePhoto.files[0];if(!file){toast('Choose a profile photo first.');return}const f=new FormData();f.append('image',file);try{const d=await api('/miniapp/profile/photo/',{method:'POST',body:f});updateProfileAvatar(d.profile);profileImage.src=d.profile.profile_image;toast('Profile photo updated.');closeProfile()}catch(e){toast(e.message)}}
+function renderSupportTicket(t){return `<div class="card"><div class="row"><b>#${t.id} ${esc(t.subject||'Support request')}</b><span class="pill">${esc(t.status)}</span></div><div class="muted" style="margin:5px 0 10px">${t.related_order_id?'Order #'+esc(t.related_order_id)+' · ':''}${t.assigned_agent?'Agent: '+esc(t.assigned_agent):'ShopU support'}</div>${(t.messages||[]).map(m=>`<div class="support-message ${esc(m.role)}"><b>${esc(m.role)}</b><div>${esc(m.content)}</div><span class="muted">${new Date(m.created_at).toLocaleString()}</span></div>`).join('')}<div class="support-compose">${['closed','expired'].includes(t.status)?'<span class="muted">This ticket is closed.</span>':`<input id="reply-${t.id}" class="field" maxlength="5000" placeholder="Reply to support…"><button class="btn primary" onclick="replySupport(${t.id})">Send</button>`}${t.status==='open'?`<button class="btn" onclick="requestAgent(${t.id})">Live agent</button>`:''}${['closed','expired','resolved'].includes(t.status)?'':`<button class="btn ghost" onclick="closeSupport(${t.id})">Close</button>`}</div></div>`}
+async function loadSupport(){try{const d=await api('/api/support/tickets/',{method:'POST'});supportList.innerHTML=d.tickets.length?d.tickets.map(renderSupportTicket).join(''):'<div class="card empty"><div class="empty-icon">💬</div><b>No support conversations</b><p>Start a support request above.</p></div>'}catch(e){supportList.innerHTML='<div class="card empty">'+esc(e.message)+'</div>'}}
+async function loadAgentQueue(){try{const d=await api('/api/support/agent/queue/',{method:'POST'});const rows=[...(d.waiting||[]).map(t=>({...t,queue:'Waiting'})),...(d.assigned||[]).map(t=>({...t,queue:'Assigned to me'}))];agentQueue.innerHTML=rows.length?rows.map(t=>`<div class="card"><div class="row"><b>#${t.id} ${esc(t.subject||'Support')}</b><span class="pill">${esc(t.queue)}</span></div><div class="muted">${esc(t.requester)} · ${t.field?esc(t.field):'General'} ${t.related_order_id?'· Order #'+esc(t.related_order_id):''}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${t.status==='waiting_agent'?`<button class="btn primary" onclick="agentClaim(${t.id})">Claim</button>`:''}${t.status==='assigned'?`<input id="agent-reply-${t.id}" class="field" maxlength="5000" placeholder="Reply…"><button class="btn primary" onclick="agentReply(${t.id})">Send</button><button class="btn" onclick="agentResolve(${t.id})">Resolve</button>`:''}</div></div>`).join(''):'<div class="card empty">No tickets in your queue.</div>'}catch(e){agentQueue.innerHTML='<div class="card empty">'+esc(e.message)+'</div>'}}
+async function agentClaim(id){try{await api('/api/support/agent/tickets/'+id+'/claim/',{method:'POST',body:new FormData()});toast('Ticket claimed.');loadAgentQueue();loadSupport()}catch(e){toast(e.message)}}
+async function agentReply(id){const input=document.getElementById('agent-reply-'+id);if(!input.value.trim())return;try{const f=new FormData();f.append('content',input.value);await api('/api/support/agent/tickets/'+id+'/messages/',{method:'POST',body:f});toast('Reply sent.');loadAgentQueue()}catch(e){toast(e.message)}}
+async function agentResolve(id){try{await api('/api/support/agent/tickets/'+id+'/resolve/',{method:'POST',body:new FormData()});toast('Ticket resolved.');loadAgentQueue();loadSupport()}catch(e){toast(e.message)}}
+async function createSupportTicket(){try{const f=new FormData();f.append('subject',supportSubject.value);f.append('message',supportMessage.value);if(supportOrder.value.trim())f.append('related_order_id',supportOrder.value.trim());await api('/api/support/tickets/create/',{method:'POST',body:f});supportSubject.value='';supportMessage.value='';supportOrder.value='';toast('Support request created.');loadSupport()}catch(e){toast(e.message)}}
+async function replySupport(id){const input=document.getElementById('reply-'+id);if(!input.value.trim())return;try{const f=new FormData();f.append('content',input.value);await api('/api/support/tickets/'+id+'/messages/',{method:'POST',body:f});toast('Reply sent.');loadSupport()}catch(e){toast(e.message)}}
+async function requestAgent(id){try{await api('/api/support/tickets/'+id+'/agent/',{method:'POST',body:new FormData()});toast('You are in the live-agent queue.');loadSupport()}catch(e){toast(e.message)}}
+async function closeSupport(id){try{await api('/api/support/tickets/'+id+'/close/',{method:'POST',body:new FormData()});toast('Support ticket closed.');loadSupport()}catch(e){toast(e.message)}}
+async function loadListingPolicy(){try{const d=await fetch('/miniapp/listing-policy/').then(r=>r.json());listingPolicy.textContent=d.content}catch(e){listingPolicy.textContent='ShopU seller terms could not be loaded.'}}
+async function initializeMiniApp(){
+  await boot();
+  loadProducts();
+  loadListingPolicy();
+
+  const hash = (window.location.hash || '').replace(/^#/, '').toLowerCase();
+
+  if(hash === 'escrow'){
+    tab('escrow', document.querySelector('[data-tab="escrow"]'));
+  }
+}
+
+initializeMiniApp();
+</script>
+</body>
+</html>
