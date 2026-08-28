@@ -3,15 +3,25 @@ from .models import StaffRole
 
 
 def _keys(request, action):
-    if request.user.is_superuser:
-        return {"*"}
-    roles = StaffRole.objects.filter(users=request.user, active=True).only("permissions")
+    user = getattr(request, "user", None)
+
+    # Anonymous users must never reach the StaffRole M2M query.
+    if not user or not user.is_authenticated:
+        return set()
+
+    roles = StaffRole.objects.filter(
+        users=user,
+        active=True,
+    ).only("permissions")
+
     keys = set()
     for role in roles:
-        for raw in role.permissions or []:
-            keys.add(str(raw).strip().lower())
-    return keys
+        permissions = role.permissions or {}
+        values = permissions.get(action, [])
+        if isinstance(values, (list, tuple, set)):
+            keys.update(str(v) for v in values)
 
+    return keys
 
 def _allowed(request, model, action):
     if request.user.is_superuser:
