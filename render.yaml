@@ -82,6 +82,16 @@ services:
           type: web
           name: shopu-web
           envVarKey: TELEGRAM_MAIN_BOT_USERNAME
+      - key: MINIAPP_URL
+        fromService:
+          type: web
+          name: shopu-web
+          envVarKey: MINIAPP_URL
+      - key: TELEGRAM_NOTIFICATION_BOT_TOKEN
+        fromService:
+          type: web
+          name: shopu-web
+          envVarKey: TELEGRAM_NOTIFICATION_BOT_TOKEN
       - key: SHOPU_WEB_HOST
         fromService:
           type: web
