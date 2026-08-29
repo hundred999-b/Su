@@ -1,5 +1,6 @@
 import os
 import django
+from asgiref.sync import sync_to_async
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
@@ -11,6 +12,7 @@ from referrals.services import ensure_referral_profile, attribute_referral, refe
 from referrals.models import ReferralProgramSettings
 
 
+@sync_to_async
 def get_or_create_telegram_user(telegram_user_id, username=None):
     from .models import TelegramAccount
 
@@ -51,16 +53,19 @@ def get_or_create_telegram_user(telegram_user_id, username=None):
     return user
 
 
+@sync_to_async
 def products():
     return list(Product.objects.filter(active=True).select_related("seller"))
 
 
+@sync_to_async
 def product_details(product_id):
     return Product.objects.filter(
         pk=product_id, active=True
     ).select_related("seller").first()
 
 
+@sync_to_async
 def user_orders(user):
     return list(
         Order.objects.filter(buyer=user)
@@ -69,14 +74,17 @@ def user_orders(user):
     )
 
 
+@sync_to_async
 def user_wallet(user):
     return wallet_balance(user, "USD")
 
 
+@sync_to_async
 def get_referral_link(user, bot_username):
     return referral_link(bot_username, user)
 
 
+@sync_to_async
 def apply_start_referral(user, start_argument):
     value = (start_argument or "").strip()
     if value.startswith("ref_"):
