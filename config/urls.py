@@ -22,8 +22,10 @@ from django.conf.urls.static import static
 from marketplace.api import wallet, test_deposit_api
 from config.maintenance import auto_release
 from config.views import health, home
+from telegram_integration.webhook_views import telegram_webhook
 
 urlpatterns = [
+    path("telegram/webhook/", telegram_webhook, name="telegram_webhook"),
     path("control-center/", include("controlcenter.urls")),
     path("", home, name="home"),
     path("health/", health, name="health"),
