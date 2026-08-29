@@ -5,7 +5,7 @@ services:
     plan: free
     region: frankfurt
     autoDeployTrigger: commit
-    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput
+    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py set_telegram_webhook
     startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     healthCheckPath: /health/
     envVars:
@@ -51,49 +51,3 @@ services:
         value: "us-east-1"
       - key: SUPABASE_STORAGE_BUCKET
         value: "shopu-media"
-
-  - type: worker
-    name: shopu-telegram
-    runtime: python
-    plan: starter
-    region: frankfurt
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m telegram_integration.telegram_bot
-    envVars:
-      - key: DJANGO_SECRET_KEY
-        fromService:
-          type: web
-          name: shopu-web
-          envVarKey: DJANGO_SECRET_KEY
-      - key: DJANGO_DEBUG
-        value: "false"
-      - key: DATABASE_URL
-        fromService:
-          type: web
-          name: shopu-web
-          envVarKey: DATABASE_URL
-      - key: TELEGRAM_MAIN_BOT_TOKEN
-        fromService:
-          type: web
-          name: shopu-web
-          envVarKey: TELEGRAM_MAIN_BOT_TOKEN
-      - key: TELEGRAM_MAIN_BOT_USERNAME
-        fromService:
-          type: web
-          name: shopu-web
-          envVarKey: TELEGRAM_MAIN_BOT_USERNAME
-      - key: MINIAPP_URL
-        fromService:
-          type: web
-          name: shopu-web
-          envVarKey: MINIAPP_URL
-      - key: TELEGRAM_NOTIFICATION_BOT_TOKEN
-        fromService:
-          type: web
-          name: shopu-web
-          envVarKey: TELEGRAM_NOTIFICATION_BOT_TOKEN
-      - key: SHOPU_WEB_HOST
-        fromService:
-          type: web
-          name: shopu-web
-          property: host

@@ -265,6 +265,11 @@ TELEGRAM_MAIN_BOT_USERNAME = os.environ.get(
     "TELEGRAM_MAIN_BOT_USERNAME",
     os.environ.get("TELEGRAM_BOT_USERNAME", ""),
 ).strip().lstrip("@")
+TELEGRAM_WEBHOOK_SECRET = os.environ.get(
+    "TELEGRAM_WEBHOOK_SECRET",
+    "",
+).strip()
+
 TELEGRAM_NOTIFICATION_BOT_TOKEN = os.environ.get(
     "TELEGRAM_NOTIFICATION_BOT_TOKEN",
     "",
