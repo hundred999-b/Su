@@ -89,8 +89,7 @@ async def telegram_webhook(request):
     try:
         application = get_application()
 
-        if not application.initialized:
-            await application.initialize()
+        await application.initialize()
 
         update = Update.de_json(
             data,
