@@ -1,5 +1,6 @@
 import os
 import django
+from asgiref.sync import sync_to_async
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
@@ -32,13 +33,13 @@ MINIAPP_URL = getattr(settings, "MINIAPP_URL", "").strip()
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tg_user = update.effective_user
 
-    user = get_or_create_telegram_user(
+    user = await get_or_create_telegram_user(
         tg_user.id,
         tg_user.username,
     )
 
     start_argument = context.args[0] if context.args else ""
-    apply_start_referral(user, start_argument)
+    await apply_start_referral(user, start_argument)
 
     name = tg_user.first_name or tg_user.username or "there"
 
@@ -86,12 +87,12 @@ async def accept_terms_command(
     from stage4.models import TermsDocument
     from stage4.services import accept_terms, active_terms
 
-    user = get_or_create_telegram_user(
+    user = await get_or_create_telegram_user(
         update.effective_user.id,
         update.effective_user.username,
     )
 
-    terms = active_terms(TermsDocument.BUYER)
+    terms = await sync_to_async(active_terms)(TermsDocument.BUYER)
 
     if not terms:
         await update.message.reply_text(
@@ -112,7 +113,7 @@ async def accept_terms_command(
         )
         return
 
-    acceptance = accept_terms(
+    acceptance = await sync_to_async(accept_terms)(
         user,
         terms,
         purpose="purchase",
@@ -130,7 +131,7 @@ async def referral_command(
 ):
     tg_user = update.effective_user
 
-    user = get_or_create_telegram_user(
+    user = await get_or_create_telegram_user(
         tg_user.id,
         tg_user.username,
     )
@@ -147,12 +148,12 @@ async def referral_command(
         )
         return
 
-    link = get_referral_link(
+    link = await get_referral_link(
         user,
         bot_username,
     )
 
-    program = ReferralProgramSettings.get_solo()
+    program = await sync_to_async(ReferralProgramSettings.get_solo)()
 
     status = (
         "enabled"
